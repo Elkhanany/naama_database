@@ -1,5 +1,5 @@
 // --- Configuration ---
-const SCRIPT_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL'; // <-- PASTE YOUR WEB APP URL HERE
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw0ZFcj7Hzpkx62iu88-C0aN4yvM-5OKmA2oRxuMje0cB9yWcEd99u-vdyHBFtPAfWBKQ/exec'; // <-- PASTE YOUR WEB APP URL HERE
 const MAP_CENTER = [29.7604, -95.3698]; // Houston, TX Coordinates (Adjust if needed)
 const INITIAL_ZOOM = 10;
 

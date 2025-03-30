@@ -1,0 +1,75 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.container {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.filters {
+    flex: 1; /* Take up some space */
+    min-width: 200px; /* Minimum width */
+    border: 1px solid #ccc;
+    padding: 15px;
+    border-radius: 5px;
+    height: fit-content; /* Don't stretch vertically */
+}
+
+.filters div {
+    margin-bottom: 10px;
+}
+.filters label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+.filters select,
+.filters input {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+}
+ .filters button {
+    padding: 10px 15px;
+    margin-top: 10px;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+
+.map-container {
+    flex: 3; /* Take up more space */
+    min-width: 400px; /* Minimum width */
+}
+
+#map {
+    height: 500px; /* Adjust as needed */
+    width: 100%;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+ #results-count {
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+/* Basic responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+    .filters, .map-container {
+        flex: none; /* Reset flex grow */
+        width: 100%;
+    }
+}

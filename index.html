@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAMA Physician Directory</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossorigin=""/>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>NAMA Physician Directory</h1>
+
+    <div class="container">
+        <div class="filters">
+            <h2>Filters</h2>
+            <div>
+                <label for="specialty-filter">Specialty:</label>
+                <select id="specialty-filter">
+                    <option value="">All Specialties</option>
+                    <!-- Options will be populated by JS -->
+                </select>
+            </div>
+            <div>
+                <label for="zip-filter">Zip Code:</label>
+                <input type="text" id="zip-filter" placeholder="Enter Zip Code">
+            </div>
+             <div>
+                <label for="language-filter">Language:</label>
+                <select id="language-filter">
+                    <option value="">All Languages</option>
+                     <!-- Options will be populated by JS -->
+                </select>
+            </div>
+            <button id="filter-button">Apply Filters</button>
+            <button id="reset-button">Reset Filters</button>
+             <div id="results-count"></div>
+        </div>
+
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+    </div>
+
+     <!-- Optional: List View -->
+     <!-- <div id="list-view"> -->
+     <!--    <h2>Matching Physicians</h2> -->
+     <!--    <ul id="physician-list"></ul> -->
+     <!-- </div> -->
+
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+</body>
+</html>

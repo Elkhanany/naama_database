@@ -35,6 +35,9 @@ function setupEventListeners() {
     filterButton.addEventListener('click', applyFilters);
     resetButton.addEventListener('click', resetFilters);
     
+    // Specialty change handler for dynamic subspecialty filtering
+    specialtyFilter.addEventListener('change', handleSpecialtyChange);
+    
     // Zip code change handler for distance slider
     zipFilter.addEventListener('input', handleZipCodeChange);
     
@@ -79,6 +82,11 @@ function optimizeForMobile() {
     document.head.appendChild(style);
 }
 
+function handleSpecialtyChange() {
+    const selectedSpecialty = specialtyFilter.value;
+    populateSubspecialtiesForSpecialty(selectedSpecialty);
+}
+
 function handleZipCodeChange() {
     const zipCode = zipFilter.value.trim();
     
@@ -88,6 +96,53 @@ function handleZipCodeChange() {
     } else {
         // Hide distance slider when zip is invalid or empty
         distanceContainer.classList.remove('show');
+    }
+}
+
+function populateSubspecialtiesForSpecialty(selectedSpecialty) {
+    // Clear current subspecialty options
+    subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
+    
+    if (!selectedSpecialty) {
+        // If no specialty selected, show all subspecialties
+        const allSubspecialties = new Set();
+        allPhysicians.forEach(doc => {
+            if (doc['Internal Medicine and Pediatric Subspecialty']) {
+                const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
+                if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
+                    allSubspecialties.add(subspecialtyValue);
+                }
+            }
+        });
+        
+        const sortedSubspecialties = [...allSubspecialties].sort();
+        sortedSubspecialties.forEach(subspec => {
+            const option = document.createElement('option');
+            option.value = subspec;
+            option.textContent = subspec;
+            subspecialtyFilter.appendChild(option);
+        });
+    } else {
+        // Filter subspecialties based on selected specialty
+        const relevantSubspecialties = new Set();
+        allPhysicians.forEach(doc => {
+            if (doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
+                if (doc['Internal Medicine and Pediatric Subspecialty']) {
+                    const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
+                    if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
+                        relevantSubspecialties.add(subspecialtyValue);
+                    }
+                }
+            }
+        });
+        
+        const sortedSubspecialties = [...relevantSubspecialties].sort();
+        sortedSubspecialties.forEach(subspec => {
+            const option = document.createElement('option');
+            option.value = subspec;
+            option.textContent = subspec;
+            subspecialtyFilter.appendChild(option);
+        });
     }
 }
 
@@ -276,19 +331,10 @@ async function fetchPhysicianData() {
 
 function populateFilters(physicians) {
     const specialties = new Set();
-    const subspecialties = new Set();
     const languages = new Set();
 
     physicians.forEach(doc => {
         if (doc.Specialty) specialties.add(doc.Specialty.trim());
-        
-        // Extract subspecialties from the "Internal Medicine and Pediatric Subspecialty" field
-        if (doc['Internal Medicine and Pediatric Subspecialty']) {
-            const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
-            if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
-                subspecialties.add(subspecialtyValue);
-            }
-        }
         
         if (doc.LanguagesSpoken) {
             // Handle potentially comma-separated languages
@@ -307,14 +353,8 @@ function populateFilters(physicians) {
         specialtyFilter.appendChild(option);
     });
 
-    // Populate Subspecialty Dropdown from actual data
-    const sortedSubspecialties = [...subspecialties].sort();
-    sortedSubspecialties.forEach(subspec => {
-        const option = document.createElement('option');
-        option.value = subspec;
-        option.textContent = subspec;
-        subspecialtyFilter.appendChild(option);
-    });
+    // Initially populate subspecialties with all available options (no specialty selected)
+    populateSubspecialtiesForSpecialty('');
 
      // Populate Language Dropdown
      const sortedLanguages = [...languages].sort();

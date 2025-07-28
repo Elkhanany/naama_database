@@ -53,17 +53,48 @@ function addMarkers(physicians) {
         if (doc.Latitude && doc.Longitude && !isNaN(doc.Latitude) && !isNaN(doc.Longitude)) {
             const marker = L.marker([doc.Latitude, doc.Longitude]);
 
-            // Create popup content
-            let popupContent = `<b>${doc.Name}</b><br>`;
-            popupContent += `Specialty: ${doc.Specialty}<br>`;
-            popupContent += `Practice: ${doc.PracticeName}<br>`;
-            popupContent += `Address: ${doc.Address}<br>`;
-             if (doc.LanguagesSpoken) {
-                popupContent += `Languages: ${doc.LanguagesSpoken}<br>`;
-             }
-             if (doc.ProfileURL && doc.ProfileURL.startsWith('http')) {
-                popupContent += `<a href="${doc.ProfileURL}" target="_blank">Profile/Website</a>`;
+            // Create popup content with enhanced styling
+            let popupContent = `
+                <div style="font-family: 'Inter', sans-serif; min-width: 250px;">
+                    <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 1.1rem;">
+                        <i class="fas fa-user-md" style="color: #667eea; margin-right: 8px;"></i>
+                        ${doc.Name}
+                    </h3>
+                    <div style="margin: 8px 0;">
+                        <i class="fas fa-stethoscope" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                        <strong>Specialty:</strong> ${doc.Specialty}
+                    </div>
+                    <div style="margin: 8px 0;">
+                        <i class="fas fa-hospital" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                        <strong>Practice:</strong> ${doc.PracticeName}
+                    </div>
+                    <div style="margin: 8px 0;">
+                        <i class="fas fa-map-marker-alt" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                        <strong>Address:</strong> ${doc.Address}
+                    </div>`;
+            
+            if (doc.LanguagesSpoken) {
+                popupContent += `
+                    <div style="margin: 8px 0;">
+                        <i class="fas fa-language" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                        <strong>Languages:</strong> ${doc.LanguagesSpoken}
+                    </div>`;
             }
+            
+            if (doc.ProfileURL && doc.ProfileURL.startsWith('http')) {
+                popupContent += `
+                    <div style="margin: 12px 0 0 0;">
+                        <a href="${doc.ProfileURL}" target="_blank" 
+                           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                  color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; 
+                                  font-size: 0.9rem; font-weight: 500;">
+                            <i class="fas fa-external-link-alt" style="margin-right: 6px;"></i>
+                            View Profile
+                        </a>
+                    </div>`;
+            }
+            
+            popupContent += `</div>`;
 
             marker.bindPopup(popupContent);
             markers.addLayer(marker);
@@ -92,7 +123,13 @@ function addMarkers(physicians) {
 
 // --- Data Fetching and Processing ---
 async function fetchPhysicianData() {
+    // Show loading spinner
+    const mapLoading = document.getElementById('map-loading');
+    if (mapLoading) mapLoading.style.display = 'block';
+    
     resultsCount.textContent = "Loading physicians...";
+    resultsCount.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    
     try {
         const response = await fetch(SCRIPT_URL);
         if (!response.ok) {
@@ -115,12 +152,20 @@ async function fetchPhysicianData() {
 
         populateFilters(allPhysicians);
         addMarkers(allPhysicians); // Display all initially
+        
+        // Update results count with success styling
         resultsCount.textContent = `Showing ${allPhysicians.length} physician(s).`;
+        resultsCount.style.background = "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)";
 
     } catch (error) {
         console.error("Error fetching physician data:", error);
-        resultsCount.textContent = "Failed to load physician data. Please try again later.";
+        resultsCount.textContent = `Error loading data: ${error.message}`;
+        resultsCount.style.background = "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)";
         // Optionally display a more user-friendly error message on the page
+    } finally {
+        // Hide loading spinner
+        const mapLoading = document.getElementById('map-loading');
+        if (mapLoading) mapLoading.style.display = 'none';
     }
 }
 

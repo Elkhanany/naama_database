@@ -3,44 +3,72 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NAMA Physician Directory</title>
+    <title>NAAMA Physician Directory</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
           crossorigin=""/>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>NAMA Physician Directory</h1>
+    <header style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); color: #2c3e50; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between;">
+        <h1 style="margin: 0; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em;">
+            <i class="fas fa-user-md" style="margin-right: 10px; color: #667eea;"></i>
+            NAAMA Physician Directory
+        </h1>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 0.9rem; color: #718096;">Find healthcare providers near you</span>
+            <!-- Optional logo placeholder -->
+            <!-- <img src="logo.png" alt="NAAMA Logo" style="height: 40px;"> -->
+        </div>
+    </header>
 
-    <div class="container">
+    <div class="container" style="margin-top: 30px;">
         <div class="filters">
-            <h2>Filters</h2>
-            <div>
-                <label for="specialty-filter">Specialty:</label>
+            <h2><i class="fas fa-filter" style="margin-right: 8px; color: #667eea;"></i>Filters</h2>
+            
+            <div class="filter-group">
+                <label for="specialty-filter"><i class="fas fa-stethoscope" style="margin-right: 5px;"></i>Specialty:</label>
                 <select id="specialty-filter">
                     <option value="">All Specialties</option>
                     <!-- Options will be populated by JS -->
                 </select>
             </div>
-            <div>
-                <label for="zip-filter">Zip Code:</label>
+            
+            <div class="filter-group">
+                <label for="zip-filter"><i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i>Zip Code:</label>
                 <input type="text" id="zip-filter" placeholder="Enter Zip Code">
             </div>
-             <div>
-                <label for="language-filter">Language:</label>
+            
+            <div class="filter-group">
+                <label for="language-filter"><i class="fas fa-language" style="margin-right: 5px;"></i>Language:</label>
                 <select id="language-filter">
                     <option value="">All Languages</option>
-                     <!-- Options will be populated by JS -->
+                    <!-- Options will be populated by JS -->
                 </select>
             </div>
-            <button id="filter-button">Apply Filters</button>
-            <button id="reset-button">Reset Filters</button>
-             <div id="results-count"></div>
+            
+            <div class="button-group">
+                <button id="filter-button" class="btn btn-primary">
+                    <i class="fas fa-search"></i>
+                    Apply Filters
+                </button>
+                <button id="reset-button" class="btn btn-secondary">
+                    <i class="fas fa-undo"></i>
+                    Reset
+                </button>
+            </div>
+            
+            <div id="results-count"></div>
         </div>
 
         <div class="map-container">
+            <div id="map-loading" class="loading-spinner" style="display: none;">
+                <div class="spinner"></div>
+            </div>
             <div id="map"></div>
         </div>
     </div>

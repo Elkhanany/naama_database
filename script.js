@@ -10,23 +10,126 @@ let markers = L.layerGroup(); // Layer group to manage markers
 
 // --- DOM Elements ---
 const specialtyFilter = document.getElementById('specialty-filter');
+const subspecialtyFilter = document.getElementById('subspecialty-filter');
+const subspecialtyContainer = document.getElementById('subspecialty-container');
 const zipFilter = document.getElementById('zip-filter');
+const distanceSlider = document.getElementById('distance-slider');
+const distanceContainer = document.getElementById('distance-container');
+const distanceValue = document.getElementById('distance-value');
 const languageFilter = document.getElementById('language-filter');
 const filterButton = document.getElementById('filter-button');
 const resetButton = document.getElementById('reset-button');
 const resultsCount = document.getElementById('results-count');
-// const physicianList = document.getElementById('physician-list'); // If using list view
+
+// Subspecialty mapping
+const subspecialtyMap = {
+    'Internal Medicine': ['Cardiology', 'Endocrinology', 'Gastroenterology', 'Hematology/Oncology', 'Infectious Disease', 'Nephrology', 'Pulmonology', 'Rheumatology'],
+    'Surgery': ['General Surgery', 'Cardiac Surgery', 'Neurosurgery', 'Orthopedic Surgery', 'Plastic Surgery', 'Vascular Surgery'],
+    'Pediatrics': ['Pediatric Cardiology', 'Pediatric Endocrinology', 'Pediatric Gastroenterology', 'Pediatric Hematology/Oncology', 'Pediatric Neurology'],
+    'Radiology': ['Diagnostic Radiology', 'Interventional Radiology', 'Nuclear Medicine', 'Radiation Oncology'],
+    'Anesthesiology': ['Cardiac Anesthesia', 'Pain Management', 'Pediatric Anesthesia'],
+    'Psychiatry': ['Child Psychiatry', 'Geriatric Psychiatry', 'Addiction Psychiatry']
+};
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
     initializeMap();
     fetchPhysicianData();
-
-    filterButton.addEventListener('click', applyFilters);
-    resetButton.addEventListener('click', resetFilters);
+    setupEventListeners();
 });
 
-// --- Map Functions ---
+function setupEventListeners() {
+    filterButton.addEventListener('click', applyFilters);
+    resetButton.addEventListener('click', resetFilters);
+    
+    // Specialty change handler for subspecialty
+    specialtyFilter.addEventListener('change', handleSpecialtyChange);
+    
+    // Zip code change handler for distance slider
+    zipFilter.addEventListener('input', handleZipCodeChange);
+    
+    // Distance slider handler
+    distanceSlider.addEventListener('input', updateDistanceValue);
+}
+
+function handleSpecialtyChange() {
+    const selectedSpecialty = specialtyFilter.value;
+    
+    if (subspecialtyMap[selectedSpecialty]) {
+        // Show subspecialty filter
+        subspecialtyContainer.style.display = 'block';
+        populateSubspecialties(selectedSpecialty);
+    } else {
+        // Hide subspecialty filter
+        subspecialtyContainer.style.display = 'none';
+        subspecialtyFilter.value = '';
+    }
+}
+
+function handleZipCodeChange() {
+    const zipCode = zipFilter.value.trim();
+    
+    if (zipCode.length === 5 && /^\d+$/.test(zipCode)) {
+        // Show distance slider when valid zip is entered
+        distanceContainer.classList.add('show');
+    } else {
+        // Hide distance slider when zip is invalid or empty
+        distanceContainer.classList.remove('show');
+    }
+}
+
+function updateDistanceValue() {
+    const distance = distanceSlider.value;
+    distanceValue.textContent = distance;
+}
+
+function populateSubspecialties(specialty) {
+    subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
+    
+    if (subspecialtyMap[specialty]) {
+        subspecialtyMap[specialty].forEach(subspecialty => {
+            const option = document.createElement('option');
+            option.value = subspecialty;
+            option.textContent = subspecialty;
+            subspecialtyFilter.appendChild(option);
+        });
+    }
+}
+
+// --- Utility Functions ---
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 3959; // Radius of the Earth in miles
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+        Math.sin(dLat/2) * Math.sin(dLat/2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+        Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c; // Distance in miles
+    return distance;
+}
+
+function deg2rad(deg) {
+    return deg * (Math.PI/180);
+}
+
+async function getZipCodeCoordinates(zipCode) {
+    try {
+        // Using a free geocoding service (you might want to use a more reliable one)
+        const response = await fetch(`https://api.zippopotam.us/us/${zipCode}`);
+        if (!response.ok) throw new Error('Zip code not found');
+        
+        const data = await response.json();
+        return {
+            lat: parseFloat(data.places[0].latitude),
+            lng: parseFloat(data.places[0].longitude)
+        };
+    } catch (error) {
+        console.error('Error geocoding zip code:', error);
+        return null;
+    }
+}
 function initializeMap() {
     map = L.map('map').setView(MAP_CENTER, INITIAL_ZOOM);
 
@@ -204,32 +307,69 @@ function populateFilters(physicians) {
 }
 
 // --- Filtering Logic ---
-function applyFilters() {
+async function applyFilters() {
     const selectedSpecialty = specialtyFilter.value;
-    const selectedZip = zipFilter.value.trim();
-     const selectedLanguage = languageFilter.value;
+    const selectedSubspecialty = subspecialtyFilter.value;
+    const selectedLanguage = languageFilter.value;
+    const enteredZip = zipFilter.value.trim();
+    const maxDistance = parseFloat(distanceSlider.value);
 
-    const filteredPhysicians = allPhysicians.filter(doc => {
-        const specialtyMatch = !selectedSpecialty || (doc.Specialty && doc.Specialty.trim() === selectedSpecialty);
-        // Simple zip code check (adjust if you need radius search)
-        const zipMatch = !selectedZip || (doc.Address && doc.Address.includes(selectedZip));
-         // Check if the selected language is within the LanguagesSpoken string
-        const languageMatch = !selectedLanguage || (doc.LanguagesSpoken && doc.LanguagesSpoken.split(',').map(l => l.trim()).includes(selectedLanguage));
+    let filtered = [...allPhysicians];
 
+    // Filter by specialty
+    if (selectedSpecialty) {
+        filtered = filtered.filter(doc => 
+            doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())
+        );
+    }
 
-        return specialtyMatch && zipMatch && languageMatch;
-    });
+    // Filter by subspecialty
+    if (selectedSubspecialty) {
+        filtered = filtered.filter(doc => 
+            doc.Subspecialty && doc.Subspecialty.toLowerCase().includes(selectedSubspecialty.toLowerCase())
+        );
+    }
 
-    addMarkers(filteredPhysicians);
-    // updateListView(filteredPhysicians); // If using list view
+    // Filter by language
+    if (selectedLanguage) {
+        filtered = filtered.filter(doc => 
+            doc.LanguagesSpoken && doc.LanguagesSpoken.toLowerCase().includes(selectedLanguage.toLowerCase())
+        );
+    }
+
+    // Filter by distance if zip code is provided
+    if (enteredZip.length === 5 && /^\d+$/.test(enteredZip)) {
+        const zipCoords = await getZipCodeCoordinates(enteredZip);
+        if (zipCoords) {
+            filtered = filtered.filter(doc => {
+                if (doc.Latitude && doc.Longitude && !isNaN(doc.Latitude) && !isNaN(doc.Longitude)) {
+                    const distance = calculateDistance(
+                        zipCoords.lat, zipCoords.lng,
+                        parseFloat(doc.Latitude), parseFloat(doc.Longitude)
+                    );
+                    return distance <= maxDistance;
+                }
+                return false;
+            });
+        }
+    }
+
+    addMarkers(filtered);
 }
 
 function resetFilters() {
     specialtyFilter.value = '';
-    zipFilter.value = '';
+    subspecialtyFilter.value = '';
     languageFilter.value = '';
-    addMarkers(allPhysicians); // Show all markers again
-    // updateListView(allPhysicians); // If using list view
+    zipFilter.value = '';
+    distanceSlider.value = 10;
+    updateDistanceValue();
+    
+    // Hide dynamic elements
+    subspecialtyContainer.style.display = 'none';
+    distanceContainer.classList.remove('show');
+    
+    addMarkers(allPhysicians);
 }
 
 // --- Optional: List View Update ---

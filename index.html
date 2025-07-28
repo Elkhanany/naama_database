@@ -15,14 +15,18 @@
 </head>
 <body>
     <header style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); color: #2c3e50; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between;">
-        <h1 style="margin: 0; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em;">
-            <i class="fas fa-user-md" style="margin-right: 10px; color: #667eea;"></i>
-            NAAMA Physician Directory
-        </h1>
         <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 0.9rem; color: #718096;">Find healthcare providers near you</span>
-            <!-- Optional logo placeholder -->
-            <!-- <img src="logo.png" alt="NAAMA Logo" style="height: 40px;"> -->
+            <img src="https://naama.com/wp-content/uploads/2025/01/New2025-WH-NAAMA-Full-logo.png" alt="NAAMA Logo" style="height: 50px;">
+            <div>
+                <h1 style="margin: 0; font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em; font-family: 'Playfair Display', serif;">
+                    <i class="fas fa-user-md" style="margin-right: 10px; color: #5dade2;"></i>
+                    Physician Directory
+                </h1>
+                <p style="margin: 0; font-size: 0.9rem; color: #718096; font-style: italic;">Find healthcare providers near you</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <span style="font-size: 0.8rem; color: #718096;">National Arab American Medical Association</span>
         </div>
     </header>
 
@@ -36,11 +40,29 @@
                     <option value="">All Specialties</option>
                     <!-- Options will be populated by JS -->
                 </select>
+                
+                <!-- Subspecialty filter (hidden by default) -->
+                <div id="subspecialty-container" class="subspecialty-filter">
+                    <label for="subspecialty-filter"><i class="fas fa-user-md" style="margin-right: 5px;"></i>Subspecialty:</label>
+                    <select id="subspecialty-filter">
+                        <option value="">All Subspecialties</option>
+                        <!-- Options will be populated by JS based on specialty -->
+                    </select>
+                </div>
             </div>
             
             <div class="filter-group">
                 <label for="zip-filter"><i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i>Zip Code:</label>
                 <input type="text" id="zip-filter" placeholder="Enter Zip Code">
+                
+                <!-- Distance slider (hidden by default) -->
+                <div id="distance-container" class="distance-slider-container">
+                    <label><i class="fas fa-route" style="margin-right: 5px;"></i>Distance Range:</label>
+                    <div class="slider-wrapper">
+                        <input type="range" id="distance-slider" class="distance-slider" min="1" max="50" value="10">
+                        <div class="slider-value">Within <span id="distance-value">10</span> miles</div>
+                    </div>
+                </div>
             </div>
             
             <div class="filter-group">

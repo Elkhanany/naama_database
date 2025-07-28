@@ -21,15 +21,8 @@ const filterButton = document.getElementById('filter-button');
 const resetButton = document.getElementById('reset-button');
 const resultsCount = document.getElementById('results-count');
 
-// Subspecialty mapping
-const subspecialtyMap = {
-    'Internal Medicine': ['Cardiology', 'Endocrinology', 'Gastroenterology', 'Hematology/Oncology', 'Infectious Disease', 'Nephrology', 'Pulmonology', 'Rheumatology'],
-    'Surgery': ['General Surgery', 'Cardiac Surgery', 'Neurosurgery', 'Orthopedic Surgery', 'Plastic Surgery', 'Vascular Surgery'],
-    'Pediatrics': ['Pediatric Cardiology', 'Pediatric Endocrinology', 'Pediatric Gastroenterology', 'Pediatric Hematology/Oncology', 'Pediatric Neurology'],
-    'Radiology': ['Diagnostic Radiology', 'Interventional Radiology', 'Nuclear Medicine', 'Radiation Oncology'],
-    'Anesthesiology': ['Cardiac Anesthesia', 'Pain Management', 'Pediatric Anesthesia'],
-    'Psychiatry': ['Child Psychiatry', 'Geriatric Psychiatry', 'Addiction Psychiatry']
-};
+// Subspecialty data will be populated from actual physician data field
+// "Internal Medicine and Pediatric Subspecialty"
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -42,28 +35,48 @@ function setupEventListeners() {
     filterButton.addEventListener('click', applyFilters);
     resetButton.addEventListener('click', resetFilters);
     
-    // Specialty change handler for subspecialty
-    specialtyFilter.addEventListener('change', handleSpecialtyChange);
-    
     // Zip code change handler for distance slider
     zipFilter.addEventListener('input', handleZipCodeChange);
     
     // Distance slider handler
     distanceSlider.addEventListener('input', updateDistanceValue);
+    
+    // Mobile-specific optimizations
+    if (isMobileDevice()) {
+        optimizeForMobile();
+    }
 }
 
-function handleSpecialtyChange() {
-    const selectedSpecialty = specialtyFilter.value;
-    
-    if (subspecialtyMap[selectedSpecialty]) {
-        // Show subspecialty filter
-        subspecialtyContainer.style.display = 'block';
-        populateSubspecialties(selectedSpecialty);
-    } else {
-        // Hide subspecialty filter
-        subspecialtyContainer.style.display = 'none';
-        subspecialtyFilter.value = '';
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           window.innerWidth <= 768;
+}
+
+function optimizeForMobile() {
+    // Reduce initial zoom for mobile
+    if (map) {
+        map.setView(MAP_CENTER, INITIAL_ZOOM - 1);
     }
+    
+    // Add touch-friendly class to body
+    document.body.classList.add('mobile-device');
+    
+    // Optimize popup size for mobile
+    const style = document.createElement('style');
+    style.textContent = `
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            max-width: 280px !important;
+        }
+        .leaflet-popup-content {
+            font-family: 'Crimson Text', serif;
+            line-height: 1.4;
+            font-size: 14px;
+            margin: 12px 16px;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 function handleZipCodeChange() {
@@ -81,19 +94,6 @@ function handleZipCodeChange() {
 function updateDistanceValue() {
     const distance = distanceSlider.value;
     distanceValue.textContent = distance;
-}
-
-function populateSubspecialties(specialty) {
-    subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
-    
-    if (subspecialtyMap[specialty]) {
-        subspecialtyMap[specialty].forEach(subspecialty => {
-            const option = document.createElement('option');
-            option.value = subspecialty;
-            option.textContent = subspecialty;
-            subspecialtyFilter.appendChild(option);
-        });
-    }
 }
 
 // --- Utility Functions ---
@@ -157,40 +157,41 @@ function addMarkers(physicians) {
             const marker = L.marker([doc.Latitude, doc.Longitude]);
 
             // Create popup content with enhanced styling
+            const isMobile = isMobileDevice();
             let popupContent = `
-                <div style="font-family: 'Inter', sans-serif; min-width: 250px;">
-                    <h3 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 1.1rem;">
-                        <i class="fas fa-user-md" style="color: #667eea; margin-right: 8px;"></i>
+                <div style="font-family: 'Crimson Text', serif; min-width: ${isMobile ? '240px' : '250px'};" class="${isMobile ? 'mobile-friendly-popup' : ''}">
+                    <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #2c3e50; font-size: ${isMobile ? '1rem' : '1.1rem'};">
+                        <i class="fas fa-user-md" style="color: #5dade2; margin-right: 8px;"></i>
                         ${doc.Name}
                     </h3>
-                    <div style="margin: 8px 0;">
-                        <i class="fas fa-stethoscope" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                        <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Specialty:</strong> ${doc.Specialty}
                     </div>
-                    <div style="margin: 8px 0;">
-                        <i class="fas fa-hospital" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                        <i class="fas fa-hospital" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Practice:</strong> ${doc.PracticeName}
                     </div>
-                    <div style="margin: 8px 0;">
-                        <i class="fas fa-map-marker-alt" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                        <i class="fas fa-map-marker-alt" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Address:</strong> ${doc.Address}
                     </div>`;
             
             if (doc.LanguagesSpoken) {
                 popupContent += `
-                    <div style="margin: 8px 0;">
-                        <i class="fas fa-language" style="color: #667eea; margin-right: 8px; width: 16px;"></i>
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                        <i class="fas fa-language" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Languages:</strong> ${doc.LanguagesSpoken}
                     </div>`;
             }
             
             if (doc.ProfileURL && doc.ProfileURL.startsWith('http')) {
                 popupContent += `
-                    <div style="margin: 12px 0 0 0;">
+                    <div style="margin: ${isMobile ? '10px' : '12px'} 0 0 0;">
                         <a href="${doc.ProfileURL}" target="_blank" 
-                           style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                  color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; 
-                                  font-size: 0.9rem; font-weight: 500;">
+                           style="display: inline-block; background: linear-gradient(135deg, #5dade2 0%, #2980b9 100%); 
+                                  color: white; padding: ${isMobile ? '10px 14px' : '8px 16px'}; text-decoration: none; border-radius: 6px; 
+                                  font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation;">
                             <i class="fas fa-external-link-alt" style="margin-right: 6px;"></i>
                             View Profile
                         </a>
@@ -275,11 +276,21 @@ async function fetchPhysicianData() {
 
 function populateFilters(physicians) {
     const specialties = new Set();
-     const languages = new Set();
+    const subspecialties = new Set();
+    const languages = new Set();
 
     physicians.forEach(doc => {
         if (doc.Specialty) specialties.add(doc.Specialty.trim());
-         if (doc.LanguagesSpoken) {
+        
+        // Extract subspecialties from the "Internal Medicine and Pediatric Subspecialty" field
+        if (doc['Internal Medicine and Pediatric Subspecialty']) {
+            const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
+            if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
+                subspecialties.add(subspecialtyValue);
+            }
+        }
+        
+        if (doc.LanguagesSpoken) {
             // Handle potentially comma-separated languages
             doc.LanguagesSpoken.split(',').forEach(lang => {
                 if (lang.trim()) languages.add(lang.trim());
@@ -294,6 +305,15 @@ function populateFilters(physicians) {
         option.value = spec;
         option.textContent = spec;
         specialtyFilter.appendChild(option);
+    });
+
+    // Populate Subspecialty Dropdown from actual data
+    const sortedSubspecialties = [...subspecialties].sort();
+    sortedSubspecialties.forEach(subspec => {
+        const option = document.createElement('option');
+        option.value = subspec;
+        option.textContent = subspec;
+        subspecialtyFilter.appendChild(option);
     });
 
      // Populate Language Dropdown
@@ -326,7 +346,8 @@ async function applyFilters() {
     // Filter by subspecialty
     if (selectedSubspecialty) {
         filtered = filtered.filter(doc => 
-            doc.Subspecialty && doc.Subspecialty.toLowerCase().includes(selectedSubspecialty.toLowerCase())
+            doc['Internal Medicine and Pediatric Subspecialty'] && 
+            doc['Internal Medicine and Pediatric Subspecialty'].toLowerCase().includes(selectedSubspecialty.toLowerCase())
         );
     }
 

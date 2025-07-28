@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>NAAMA Physician Directory</title>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -41,12 +44,12 @@
                     <!-- Options will be populated by JS -->
                 </select>
                 
-                <!-- Subspecialty filter (hidden by default) -->
+                <!-- Subspecialty filter (always visible) -->
                 <div id="subspecialty-container" class="subspecialty-filter">
                     <label for="subspecialty-filter"><i class="fas fa-user-md" style="margin-right: 5px;"></i>Subspecialty:</label>
                     <select id="subspecialty-filter">
                         <option value="">All Subspecialties</option>
-                        <!-- Options will be populated by JS based on specialty -->
+                        <!-- Options will be populated by JS from actual data -->
                     </select>
                 </div>
             </div>

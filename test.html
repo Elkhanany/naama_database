@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div id="map" style="height: 400px; width: 100%;"></div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        console.log('Script loaded');
+        console.log('Leaflet:', typeof L);
+        
+        // Simple map test
+        try {
+            const map = L.map('map').setView([29.7604, -95.3698], 10);
+            console.log('Map created:', map);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            console.log('Map should be visible now');
+        } catch (error) {
+            console.error('Error creating map:', error);
+        }
+    </script>
+</body>
+</html>

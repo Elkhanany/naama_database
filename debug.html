@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAAMA Debug</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #debug { background: yellow; padding: 10px; margin: 10px; }
+        #map { border: 2px solid red; background: lightblue; }
+        
+        /* Ensure proper layout */
+        body { margin: 0; }
+        
+        /* Header should be full width */
+        header {
+            width: 100% !important;
+            display: block !important;
+            position: relative !important;
+            z-index: 1000 !important;
+        }
+        
+        .container { 
+            display: flex !important; 
+            flex-direction: row !important; 
+            gap: 24px !important;
+            max-width: 1400px !important;
+            margin: 30px auto 0 auto !important;
+            padding: 0 20px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        .filters { 
+            flex: 0 0 320px !important; 
+            background: rgba(255, 255, 255, 0.95) !important;
+            padding: 24px !important;
+            border-radius: 16px !important;
+        }
+        .map-container { 
+            flex: 1 1 0% !important; 
+            min-width: 600px !important;
+        }
+        #map {
+            width: 100% !important;
+            height: 600px !important;
+            border-radius: 16px !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="debug">Debug Info: <span id="status">Loading...</span></div>
+    
+    <header style="background: linear-gradient(90deg, #90caf9 0%, #bbdefb 50%, #e3f2fd 100%); padding: 15px 20px; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <img src="https://naama.com/wp-content/uploads/2025/01/New2025-WH-NAAMA-Full-logo.png" alt="NAAMA Logo" style="height: 50px;">
+            <div>
+                <h1 style="margin: 0; font-size: 1.6rem; font-weight: 600; color: #000000;">
+                    <i class="fas fa-user-md" style="margin-right: 10px; color: #5dade2;"></i>
+                    Physician Directory
+                </h1>
+                <p style="margin: 0; font-size: 0.9rem; color: #000000; font-style: italic;">Find healthcare providers near you</p>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <span style="font-size: 0.8rem; color: #000000;">National Arab American Medical Association</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="filters">
+            <h2>Filters</h2>
+            <div class="filter-group">
+                <div>
+                    <label for="specialty-filter">Specialty:</label>
+                    <select id="specialty-filter">
+                        <option value="">All Specialties</option>
+                    </select>
+                </div>
+                <div id="subspecialty-container">
+                    <label for="subspecialty-filter">Subspecialty:</label>
+                    <select id="subspecialty-filter">
+                        <option value="">All Subspecialties</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="language-filter">Language:</label>
+                    <select id="language-filter">
+                        <option value="">All Languages</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="zip-filter">Near ZIP Code:</label>
+                    <input type="text" id="zip-filter" placeholder="Enter ZIP code">
+                </div>
+                <div id="distance-container">
+                    <label for="distance-slider">Within <span id="distance-value">10</span> miles:</label>
+                    <input type="range" id="distance-slider" min="1" max="50" value="10" step="1">
+                </div>
+                <button id="reset-button">Reset Filters</button>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="results-count">Loading...</div>
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const status = document.getElementById('status');
+        
+        function updateStatus(msg) {
+            status.textContent = msg;
+            console.log('Status:', msg);
+        }
+        
+        updateStatus('Script loaded');
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus('DOM loaded');
+            
+            // Check if Leaflet is available
+            if (typeof L === 'undefined') {
+                updateStatus('ERROR: Leaflet not loaded');
+                return;
+            }
+            updateStatus('Leaflet available');
+            
+            // Check if map element exists
+            const mapEl = document.getElementById('map');
+            if (!mapEl) {
+                updateStatus('ERROR: Map element not found');
+                return;
+            }
+            updateStatus('Map element found');
+            
+            try {
+                // Initialize map
+                const map = L.map('map').setView([29.7604, -95.3698], 10);
+                updateStatus('Map object created');
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                
+                updateStatus('Tiles added - MAP SHOULD BE VISIBLE');
+                
+                // Add a test marker
+                L.marker([29.7604, -95.3698]).addTo(map)
+                    .bindPopup('Test marker - Houston, TX')
+                    .openPopup();
+                    
+                updateStatus('Test marker added');
+                
+            } catch (error) {
+                updateStatus('ERROR: ' + error.message);
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html>

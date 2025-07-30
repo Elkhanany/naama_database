@@ -1,12 +1,19 @@
 // --- Configuration ---
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw0ZFcj7Hzpkx62iu88-C0aN4yvM-5OKmA2oRxuMje0cB9yWcEd99u-vdyHBFtPAfWBKQ/exec'; // <-- PASTE YOUR WEB APP URL HERE
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxXUgIVVSIgvOaGQq6laMtA8EeiGEvdPF60eK8JoZDVZnUSW9bZRfI5wgbjDh04ICs6Qw/exec'; // <-- PASTE YOUR WEB APP URL HERE
 const MAP_CENTER = [29.7604, -95.3698]; // Houston, TX Coordinates (Adjust if needed)
 const INITIAL_ZOOM = 10;
 
 // --- Global Variables ---
 let map;
 let allPhysicians = []; // To store the fetched data
-let markers = L.layerGroup(); // Layer group to manage markers
+let specialtySubspecialtyMap = new Map(); // Map specialty to its subspecialties
+// Use featureGroup to enable getBounds for marker fitting
+let markers = L.featureGroup(); // Feature group to manage markers
+// Dynamically determine the key for subspecialty after data fetch
+let subspecialtyKey = null;
+// Performance optimization variables
+let filterTimeout = null;
+const FILTER_DEBOUNCE_MS = 300; // Debounce filtering for better performance
 
 // --- DOM Elements ---
 const specialtyFilter = document.getElementById('specialty-filter');
@@ -25,6 +32,10 @@ const resultsCount = document.getElementById('results-count');
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM Content Loaded');
+    console.log('Leaflet available:', typeof L);
+    console.log('Map element exists:', !!document.getElementById('map'));
+    
     initializeMap();
     fetchPhysicianData();
     setupEventListeners();
@@ -33,19 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupEventListeners() {
     resetButton.addEventListener('click', resetFilters);
     
-    // Dynamic filtering for all controls
+    // Debounced filtering function for better performance
+    const debouncedFilter = () => {
+        clearTimeout(filterTimeout);
+        filterTimeout = setTimeout(applyFilters, FILTER_DEBOUNCE_MS);
+    };
+    
+    // Dynamic filtering for all controls with debouncing
     specialtyFilter.addEventListener('change', () => {
         handleSpecialtyChange();
-        applyFilters(); 
+        debouncedFilter(); 
     });
     
-    subspecialtyFilter.addEventListener('change', applyFilters);
-    languageFilter.addEventListener('change', applyFilters);
-    zipFilter.addEventListener('input', applyFilters); // Filter as user types zip
+    subspecialtyFilter.addEventListener('change', debouncedFilter);
+    languageFilter.addEventListener('change', debouncedFilter);
+    zipFilter.addEventListener('input', debouncedFilter); // Debounced as user types
     
     distanceSlider.addEventListener('input', () => {
         updateDistanceValue();
-        applyFilters(); 
+        debouncedFilter(); 
     });
     
     // Mobile-specific optimizations
@@ -68,23 +85,63 @@ function optimizeForMobile() {
     // Add touch-friendly class to body
     document.body.classList.add('mobile-device');
     
-    // Optimize popup size for mobile
+    // Optimize popup size and touch interactions for mobile
     const style = document.createElement('style');
     style.textContent = `
-        .leaflet-popup-content-wrapper {
+        .mobile-device .leaflet-popup-content-wrapper {
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             max-width: 280px !important;
         }
-        .leaflet-popup-content {
+        .mobile-device .leaflet-popup-content {
             font-family: 'Tahoma', sans-serif;
             line-height: 1.4;
             font-size: 14px;
             margin: 12px 16px;
             color: #000000;
         }
+        .mobile-device .filters select,
+        .mobile-device .filters input {
+            font-size: 16px !important; /* Prevent zoom on iOS */
+            padding: 12px 16px !important;
+            border-radius: 8px !important;
+            touch-action: manipulation;
+        }
+        .mobile-device .btn {
+            padding: 12px 20px !important;
+            font-size: 16px !important;
+            min-height: 44px; /* iOS touch target size */
+            touch-action: manipulation;
+        }
+        .mobile-device .distance-slider {
+            height: 10px !important;
+            touch-action: manipulation;
+        }
+        .mobile-device .distance-slider::-webkit-slider-thumb {
+            width: 28px !important;
+            height: 28px !important;
+        }
+        .mobile-device header img {
+            max-height: 40px !important;
+        }
+        .mobile-device .leaflet-control-zoom {
+            font-size: 18px;
+        }
+        .mobile-device .leaflet-control-zoom a {
+            width: 44px;
+            height: 44px;
+            line-height: 44px;
+        }
     `;
     document.head.appendChild(style);
+    
+    // Add viewport meta tag if not present
+    if (!document.querySelector('meta[name="viewport"]')) {
+        const viewport = document.createElement('meta');
+        viewport.name = 'viewport';
+        viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        document.head.appendChild(viewport);
+    }
 }
 
 function handleSpecialtyChange() {
@@ -95,38 +152,21 @@ function handleSpecialtyChange() {
 function populateSubspecialtiesForSpecialty(selectedSpecialty) {
     // Clear current subspecialty options
     subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
-    
-    console.log(`populateSubspecialtiesForSpecialty called with specialty: "${selectedSpecialty}"`);
-    const subspecialtiesToPopulate = new Set();
-
-    if (!selectedSpecialty) {
-        // If no specialty is selected, populate with all unique subspecialties
-        allPhysicians.forEach(doc => {
-            if (doc['Subpecialty']) {
-                const subspecialtyValue = doc['Subpecialty'].trim();
-                if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
-                    subspecialtiesToPopulate.add(subspecialtyValue);
-                }
-            }
-        });
-    } else {
-        // Filter subspecialties based on the selected specialty (more flexible matching)
-        allPhysicians.forEach(doc => {
-            // Use includes for more flexible matching, but still case-sensitive for accuracy
-            if (doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
-                if (doc['Subpecialty']) {
-                    const subspecialtyValue = doc['Subpecialty'].trim();
-                    if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
-                        subspecialtiesToPopulate.add(subspecialtyValue);
-                    }
-                }
-            }
-        });
-    }
-    
-    console.log('Found subspecialties:', [...subspecialtiesToPopulate]);
-    const sortedSubspecialties = [...subspecialtiesToPopulate].sort();
-    sortedSubspecialties.forEach(subspec => {
+    console.log(`populateSubspecialtiesForSpecialty: selectedSpecialty='${selectedSpecialty}'`);
+    console.log(`Total physicians: ${allPhysicians.length}`);
+    const subspecialtiesSet = new Set();
+    allPhysicians.forEach(doc => {
+        const spec = doc.Specialty || '';
+        const subspec = subspecialtyKey && doc[subspecialtyKey] ? doc[subspecialtyKey].trim() : '';
+        if (!subspec || subspec === 'N/A') return;
+        if (!selectedSpecialty) {
+            subspecialtiesSet.add(subspec);
+        } else if (spec.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
+            console.log(` Including subspecialty '${subspec}' from doc '${doc['Full Name']}' (Specialty='${spec}')`);
+            subspecialtiesSet.add(subspec);
+        }
+    });
+    [...subspecialtiesSet].sort().forEach(subspec => {
         const option = document.createElement('option');
         option.value = subspec;
         option.textContent = subspec;
@@ -174,14 +214,40 @@ async function getZipCodeCoordinates(zipCode) {
     }
 }
 function initializeMap() {
-    map = L.map('map').setView(MAP_CENTER, INITIAL_ZOOM);
+    console.log('Initializing map...');
+    const mapElement = document.getElementById('map');
+    console.log('Map element:', mapElement);
+    console.log('Map element dimensions:', mapElement ? mapElement.offsetWidth + 'x' + mapElement.offsetHeight : 'N/A');
+    
+    if (!mapElement) {
+        console.error('Map element not found!');
+        return;
+    }
+    
+    try {
+        map = L.map('map').setView(MAP_CENTER, INITIAL_ZOOM);
+        console.log('Map object created:', map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        console.log('Tiles added to map');
 
-    markers.addTo(map); // Add the layer group to the map
+        markers.addTo(map); // Add the layer group to the map
+        console.log('Markers layer added to map');
+        
+        // Force map to resize after a short delay in case of layout issues
+        setTimeout(() => {
+            if (map) {
+                map.invalidateSize();
+                console.log('Map size invalidated');
+            }
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error initializing map:', error);
+    }
 }
 
 function addMarkers(physicians) {
@@ -195,69 +261,78 @@ function addMarkers(physicians) {
     }
 
     let displayedCount = 0;
-    const markersToAdd = []; // Batch markers for better performance
     
-    physicians.forEach(doc => {
+    // Performance optimization: limit number of markers for large datasets
+    const MAX_MARKERS = 500; // Reasonable limit for performance
+    const shouldLimitMarkers = physicians.length > MAX_MARKERS;
+    const physiciansToDisplay = shouldLimitMarkers ? physicians.slice(0, MAX_MARKERS) : physicians;
+    
+    if (shouldLimitMarkers) {
+        console.log(`Performance optimization: Showing first ${MAX_MARKERS} of ${physicians.length} physicians`);
+    }
+    
+    // Group physicians by location to handle overlapping markers
+    const locationGroups = new Map();
+    
+    physiciansToDisplay.forEach(doc => {
         // Double check lat/lng are valid numbers before adding marker
         if (doc.Latitude && doc.Longitude && !isNaN(doc.Latitude) && !isNaN(doc.Longitude)) {
-            const marker = L.marker([doc.Latitude, doc.Longitude]);
-
-            // Create popup content with enhanced styling
-            const isMobile = isMobileDevice();
-            let popupContent = `
-                <div style="font-family: 'Tahoma', sans-serif; min-width: ${isMobile ? '240px' : '250px'};" class="${isMobile ? 'mobile-friendly-popup' : ''}">
-                    <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #000000; font-size: ${isMobile ? '1rem' : '1.1rem'};">
-                        <i class="fas fa-user-md" style="color: #5dade2; margin-right: 8px;"></i>
-                        ${doc['Full Name']}
-                    </h3>
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
-                        <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Specialty:</strong> ${doc.Specialty}
-                    </div>
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
-                        <i class="fas fa-hospital" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Practice:</strong> ${doc['Practice Name']}
-                    </div>
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
-                        <i class="fas fa-map-marker-alt" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Address:</strong> ${doc['Practice_address']}
-                    </div>`;
-            
-            if (doc['Languages Spoken']) {
-                popupContent += `
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
-                        <i class="fas fa-language" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Languages:</strong> ${doc['Languages Spoken']}
-                    </div>`;
+            // Use address as primary key, fallback to coordinates if no address
+            const address = doc.Address || doc['Practice_address'] || '';
+            const locationKey = address.trim() || `${doc.Latitude.toFixed(6)},${doc.Longitude.toFixed(6)}`;
+            if (!locationGroups.has(locationKey)) {
+                locationGroups.set(locationKey, []);
             }
-            
-            if (doc['Practice Webpage (If available)'] && doc['Practice Webpage (If available)'].startsWith('http')) {
-                popupContent += `
-                    <div style="margin: ${isMobile ? '10px' : '12px'} 0 0 0;">
-                        <a href="${doc['Practice Webpage (If available)']}" target="_blank" 
-                           style="display: inline-block; background: linear-gradient(135deg, #5dade2 0%, #2980b9 100%); 
-                                  color: white; padding: ${isMobile ? '10px 14px' : '8px 16px'}; text-decoration: none; border-radius: 6px; 
-                                  font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation; font-family: 'Tahoma', sans-serif;">
-                            <i class="fas fa-external-link-alt" style="margin-right: 6px;"></i>
-                            View Profile
-                        </a>
-                    </div>`;
-            }
-            
-            popupContent += `</div>`;
-
-            marker.bindPopup(popupContent);
-            markersToAdd.push(marker);
-            displayedCount++;
+            locationGroups.get(locationKey).push(doc);
         } else {
-             console.warn("Skipping physician due to invalid Lat/Lng:", doc['Full Name'], doc.Latitude, doc.Longitude);
+             console.warn("Skipping physician due to invalid Lat/Lng:", doc.Name || doc['Full Name'], doc.Latitude, doc.Longitude);
          }
     });
     
-    // Add all markers at once for better performance
-    markersToAdd.forEach(marker => markers.addLayer(marker));
+    // Create markers more efficiently using batch processing
+    const markersToAdd = [];
     
-    resultsCount.textContent = `Showing ${displayedCount} physician(s).`;
+    locationGroups.forEach((docs, locationKey) => {
+        // Use coordinates from first doctor in the group
+        const firstDoc = docs[0];
+        const baseLat = parseFloat(firstDoc.Latitude);
+        const baseLng = parseFloat(firstDoc.Longitude);
+        
+        docs.forEach((doc, index) => {
+            // Slightly offset overlapping markers
+            const offset = 0.0001; // Small offset to separate markers
+            const angle = (index * 2 * Math.PI) / docs.length; // Distribute in circle
+            const lat = baseLat + (index > 0 ? offset * Math.cos(angle) : 0);
+            const lng = baseLng + (index > 0 ? offset * Math.sin(angle) : 0);
+            
+            // Create marker with lazy popup loading for better performance
+            const marker = L.marker([lat, lng]);
+            
+            // Use lazy loading for popup content - only generate when clicked
+            marker.on('click', function() {
+                if (!this.getPopup()) {
+                    const popupContent = generatePopupContent(doc, docs, index);
+                    this.bindPopup(popupContent).openPopup();
+                }
+            });
+            
+            markersToAdd.push(marker);
+            displayedCount++;
+        });
+    });
+    
+    // Batch add all markers at once for better performance
+    if (markersToAdd.length > 0) {
+        const markerGroup = L.featureGroup(markersToAdd);
+        markers.addLayer(markerGroup);
+    }
+    
+    // Update results count with performance info
+    let countText = `Showing ${displayedCount} physician(s)`;
+    if (shouldLimitMarkers) {
+        countText += ` (limited from ${physicians.length} for performance)`;
+    }
+    resultsCount.textContent = countText;
 
     // Optional: Adjust map bounds to fit markers (only if reasonable number)
     if (displayedCount > 0 && displayedCount < 200) { // Avoid fitBounds for too many markers
@@ -267,11 +342,83 @@ function addMarkers(physicians) {
              console.warn("Could not fit bounds, likely no valid markers.", e);
              map.setView(MAP_CENTER, INITIAL_ZOOM);
          }
-    } else if (displayedCount === 0 && allPhysicians.length > 0) {
+    } else if (displayedCount === 0 && physiciansToDisplay.length > 0) {
          map.setView(MAP_CENTER, INITIAL_ZOOM);
     }
 }
 
+// Separate function for generating popup content (for lazy loading)
+function generatePopupContent(doc, docs, index) {
+    const isMobile = isMobileDevice();
+    
+    // Clean popup title without location count
+    let popupTitle = doc.Name || doc['Full Name'] || 'N/A';
+    
+    let popupContent = `
+        <div style="font-family: 'Tahoma', sans-serif; min-width: ${isMobile ? '240px' : '250px'};" class="${isMobile ? 'mobile-friendly-popup' : ''}">
+            <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #000000; font-size: ${isMobile ? '1rem' : '1.1rem'};">
+                <i class="fas fa-user-md" style="color: #5dade2; margin-right: 8px;"></i>
+                ${popupTitle}
+            </h3>
+            <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
+                <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
+                <strong>Specialty:</strong> ${doc.Specialty || 'N/A'}
+            </div>`;
+    
+    // Add subspecialty if available
+    if (subspecialtyKey && doc[subspecialtyKey]) {
+        popupContent += `
+            <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
+                <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
+                <strong>Subspecialty:</strong> ${doc[subspecialtyKey]}
+            </div>`;
+    }
+    
+    popupContent += `
+            <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
+                <i class="fas fa-hospital" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
+                <strong>Practice:</strong> ${doc.PracticeName || doc['Practice Name'] || 'N/A'}
+            </div>
+            <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
+                <i class="fas fa-map-marker-alt" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
+                <strong>Address:</strong> ${doc.Address || doc['Practice_address'] || 'N/A'}
+            </div>`;
+    
+    if (doc.LanguagesSpoken || doc['Languages Spoken']) {
+        popupContent += `
+            <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
+                <i class="fas fa-language" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
+                <strong>Languages:</strong> ${doc.LanguagesSpoken || doc['Languages Spoken']}
+            </div>`;
+    }
+    
+    if ((doc.ProfileURL || doc['Practice Webpage (If available)']) && (doc.ProfileURL || doc['Practice Webpage (If available)']).startsWith('http')) {
+        popupContent += `
+            <div style="margin: ${isMobile ? '10px' : '12px'} 0 0 0;">
+                <a href="${doc.ProfileURL || doc['Practice Webpage (If available)']}" target="_blank" 
+                   style="display: inline-block; background: linear-gradient(135deg, #5dade2 0%, #2980b9 100%); 
+                          color: white; padding: ${isMobile ? '10px 14px' : '8px 16px'}; text-decoration: none; border-radius: 6px; 
+                          font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation; font-family: 'Tahoma', sans-serif;">
+                    <i class="fas fa-external-link-alt" style="margin-right: 6px;"></i>
+                    View Profile
+                </a>
+            </div>`;
+    }
+    
+    // If multiple providers at same location, add navigation
+    if (docs.length > 1) {
+        popupContent += `
+            <div style="margin: ${isMobile ? '10px' : '12px'} 0 0 0; padding-top: 10px; border-top: 1px solid #eee;">
+                <small style="color: #666;">
+                    <i class="fas fa-info-circle" style="margin-right: 5px;"></i>
+                    ${docs.length} providers at this location. Each has a separate marker nearby.
+                </small>
+            </div>`;
+    }
+    
+    popupContent += `</div>`;
+    return popupContent;
+}
 
 // --- Data Fetching and Processing ---
 async function fetchPhysicianData() {
@@ -299,7 +446,7 @@ async function fetchPhysicianData() {
             throw new Error("Received invalid data format from the server.");
         }
 
-        // Normalize object keys and string values to trim whitespace around header names and values
+        // Normalize object keys and string values
         allPhysicians = data.physicians.map(doc => {
             const normalized = {};
             Object.keys(doc).forEach(key => {
@@ -311,7 +458,12 @@ async function fetchPhysicianData() {
             });
             return normalized;
         });
-
+        // Detect subspecialty key if present
+        if (allPhysicians.length > 0) {
+            subspecialtyKey = Object.keys(allPhysicians[0]).find(k => k.toLowerCase().includes('subspecialty'));
+            console.log('Detected subspecialty field:', subspecialtyKey);
+        }
+        
         populateFilters(allPhysicians);
         addMarkers(allPhysicians); // Display all initially
         
@@ -333,19 +485,47 @@ async function fetchPhysicianData() {
 
 
 function populateFilters(physicians) {
+    // Debug: inspect the keys and sample values in the normalized physician data to verify field names
+    if (physicians.length > 0) {
+        console.log('populateFilters: first doc keys =', Object.keys(physicians[0]));
+        console.log('populateFilters: sample Specialty =', physicians[0].Specialty, '; sample Subspecialty =', physicians[0]['Subspecialty']);
+    }
     const specialties = new Set();
     const languages = new Set();
+    // Build map of specialty to subspecialty set
+    specialtySubspecialtyMap.clear();
 
     physicians.forEach(doc => {
+        // Populate specialties set
         if (doc.Specialty) specialties.add(doc.Specialty.trim());
-        
-        if (doc['Languages Spoken']) {
-            // Handle potentially comma-separated languages
-            doc['Languages Spoken'].split(',').forEach(lang => {
-                if (lang.trim()) languages.add(lang.trim());
+        // Populate specialty→subspecialty map
+        const specKey = doc.Specialty?.trim();
+        const subspecVal = doc['Subspecialty'];
+        if (specKey && subspecVal) {
+            const subspec = subspecVal.trim();
+            if (subspec && subspec !== 'N/A') {
+                if (!specialtySubspecialtyMap.has(specKey)) {
+                    specialtySubspecialtyMap.set(specKey, new Set());
+                }
+                specialtySubspecialtyMap.get(specKey).add(subspec);
+            }
+        }
+        // Populate languages set
+        if (doc.LanguagesSpoken || doc['Languages Spoken']) {
+            const languageField = doc.LanguagesSpoken || doc['Languages Spoken'];
+            languageField.split(',').forEach(lang => {
+                const l = lang.trim();
+                if (l) languages.add(l);
             });
         }
     });
+    // Debug: log built specialty→subspecialty map
+    console.log('Built specialtySubspecialtyMap:');
+    specialtySubspecialtyMap.forEach((subSet, spec) => {
+        console.log(`  Specialty: ${spec} → Subspecialties: [${[...subSet].join(', ')}]`);
+    });
+    // Debug: log list of all specialties
+    console.log('Specialties list:', [...specialtySubspecialtyMap.keys()].sort());
 
     // Populate Specialty Dropdown
     const sortedSpecialties = [...specialties].sort();
@@ -356,21 +536,32 @@ function populateFilters(physicians) {
         specialtyFilter.appendChild(option);
     });
 
-    // Initially populate subspecialties with all available options (no specialty selected)
-    populateSubspecialtiesForSpecialty('');
-
-     // Populate Language Dropdown
-     const sortedLanguages = [...languages].sort();
-     sortedLanguages.forEach(lang => {
-         const option = document.createElement('option');
-         option.value = lang;
-         option.textContent = lang;
-         languageFilter.appendChild(option);
-     });
+    // Populate subspecialty dropdown or hide
+    if (subspecialtyKey) {
+        subspecialtyContainer.style.display = '';
+        populateSubspecialtiesForSpecialty('');
+    } else {
+        subspecialtyContainer.style.display = 'none';
+    }
+    
+    // Populate Language Dropdown
+    const sortedLanguages = [...languages].sort();
+    sortedLanguages.forEach(lang => {
+        const option = document.createElement('option');
+        option.value = lang;
+        option.textContent = lang;
+        languageFilter.appendChild(option);
+    });
 }
 
 // --- Filtering Logic ---
 async function applyFilters() {
+    // Show loading indicator for large datasets
+    const startTime = performance.now();
+    const originalText = resultsCount.textContent;
+    resultsCount.textContent = "Filtering...";
+    resultsCount.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+    
     const selectedSpecialty = specialtyFilter.value;
     const selectedSubspecialty = subspecialtyFilter.value;
     const selectedLanguage = languageFilter.value;
@@ -379,7 +570,8 @@ async function applyFilters() {
 
     let filtered = [...allPhysicians];
 
-    // Filter by specialty
+    // Optimize filtering by breaking early when possible
+    // Filter by specialty (most selective first)
     if (selectedSpecialty) {
         filtered = filtered.filter(doc => 
             doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())
@@ -387,22 +579,23 @@ async function applyFilters() {
     }
 
     // Filter by subspecialty
-    if (selectedSubspecialty) {
+    if (selectedSubspecialty && filtered.length > 0) {
         filtered = filtered.filter(doc => 
-            doc['Subpecialty'] && 
-            doc['Subpecialty'].toLowerCase().includes(selectedSubspecialty.toLowerCase())
+            subspecialtyKey && doc[subspecialtyKey] && 
+            doc[subspecialtyKey].toLowerCase().includes(selectedSubspecialty.toLowerCase())
         );
     }
 
     // Filter by language
-    if (selectedLanguage) {
-        filtered = filtered.filter(doc => 
-            doc['Languages Spoken'] && doc['Languages Spoken'].toLowerCase().includes(selectedLanguage.toLowerCase())
-        );
+    if (selectedLanguage && filtered.length > 0) {
+        filtered = filtered.filter(doc => {
+            const languageField = doc.LanguagesSpoken || doc['Languages Spoken'];
+            return languageField && languageField.toLowerCase().includes(selectedLanguage.toLowerCase());
+        });
     }
 
-    // Filter by distance if zip code is provided
-    if (enteredZip.length === 5 && /^\d+$/.test(enteredZip)) {
+    // Distance filtering (most expensive, do last)
+    if (enteredZip.length === 5 && /^\d+$/.test(enteredZip) && filtered.length > 0) {
         const zipCoords = await getZipCodeCoordinates(enteredZip);
         if (zipCoords) {
             filtered = filtered.filter(doc => {
@@ -418,7 +611,12 @@ async function applyFilters() {
         }
     }
 
-    addMarkers(filtered);
+    // Use requestAnimationFrame for better performance on large datasets
+    requestAnimationFrame(() => {
+        addMarkers(filtered);
+        const endTime = performance.now();
+        console.log(`Filtering took ${(endTime - startTime).toFixed(2)}ms`);
+    });
 }
 
 function resetFilters() {

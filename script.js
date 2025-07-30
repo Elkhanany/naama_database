@@ -35,14 +35,23 @@ function setupEventListeners() {
     filterButton.addEventListener('click', applyFilters);
     resetButton.addEventListener('click', resetFilters);
     
-    // Specialty change handler for dynamic subspecialty filtering
-    specialtyFilter.addEventListener('change', handleSpecialtyChange);
+    // Dynamic filtering - no need for apply button
+    specialtyFilter.addEventListener('change', () => {
+        handleSpecialtyChange();
+        applyFilters(); // Auto-apply filters
+    });
+    
+    subspecialtyFilter.addEventListener('change', applyFilters);
+    languageFilter.addEventListener('change', applyFilters);
     
     // Zip code change handler for distance slider
     zipFilter.addEventListener('input', handleZipCodeChange);
     
-    // Distance slider handler
-    distanceSlider.addEventListener('input', updateDistanceValue);
+    // Distance slider handler with dynamic filtering
+    distanceSlider.addEventListener('input', () => {
+        updateDistanceValue();
+        applyFilters(); // Auto-apply when slider changes
+    });
     
     // Mobile-specific optimizations
     if (isMobileDevice()) {
@@ -73,10 +82,11 @@ function optimizeForMobile() {
             max-width: 280px !important;
         }
         .leaflet-popup-content {
-            font-family: 'Crimson Text', serif;
+            font-family: 'Tahoma', sans-serif;
             line-height: 1.4;
             font-size: 14px;
             margin: 12px 16px;
+            color: #000000;
         }
     `;
     document.head.appendChild(style);
@@ -197,7 +207,8 @@ function initializeMap() {
 }
 
 function addMarkers(physicians) {
-    markers.clearLayers(); // Clear existing markers
+    // Use more efficient clearing and adding
+    markers.clearLayers();
 
     if (!Array.isArray(physicians)) {
         console.error("Data is not an array:", physicians);
@@ -205,7 +216,9 @@ function addMarkers(physicians) {
         return;
     }
 
-     let displayedCount = 0;
+    let displayedCount = 0;
+    const markersToAdd = []; // Batch markers for better performance
+    
     physicians.forEach(doc => {
         // Double check lat/lng are valid numbers before adding marker
         if (doc.Latitude && doc.Longitude && !isNaN(doc.Latitude) && !isNaN(doc.Longitude)) {
@@ -214,27 +227,27 @@ function addMarkers(physicians) {
             // Create popup content with enhanced styling
             const isMobile = isMobileDevice();
             let popupContent = `
-                <div style="font-family: 'Crimson Text', serif; min-width: ${isMobile ? '240px' : '250px'};" class="${isMobile ? 'mobile-friendly-popup' : ''}">
-                    <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #2c3e50; font-size: ${isMobile ? '1rem' : '1.1rem'};">
+                <div style="font-family: 'Tahoma', sans-serif; min-width: ${isMobile ? '240px' : '250px'};" class="${isMobile ? 'mobile-friendly-popup' : ''}">
+                    <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #000000; font-size: ${isMobile ? '1rem' : '1.1rem'};">
                         <i class="fas fa-user-md" style="color: #5dade2; margin-right: 8px;"></i>
                         ${doc.Name}
                     </h3>
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Specialty:</strong> ${doc.Specialty}
                     </div>
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-hospital" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Practice:</strong> ${doc.PracticeName}
                     </div>
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-map-marker-alt" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Address:</strong> ${doc.Address}
                     </div>`;
             
             if (doc.LanguagesSpoken) {
                 popupContent += `
-                    <div style="margin: ${isMobile ? '6px' : '8px'} 0;">
+                    <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-language" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
                         <strong>Languages:</strong> ${doc.LanguagesSpoken}
                     </div>`;
@@ -246,7 +259,7 @@ function addMarkers(physicians) {
                         <a href="${doc.ProfileURL}" target="_blank" 
                            style="display: inline-block; background: linear-gradient(135deg, #5dade2 0%, #2980b9 100%); 
                                   color: white; padding: ${isMobile ? '10px 14px' : '8px 16px'}; text-decoration: none; border-radius: 6px; 
-                                  font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation;">
+                                  font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation; font-family: 'Tahoma', sans-serif;">
                             <i class="fas fa-external-link-alt" style="margin-right: 6px;"></i>
                             View Profile
                         </a>
@@ -256,25 +269,27 @@ function addMarkers(physicians) {
             popupContent += `</div>`;
 
             marker.bindPopup(popupContent);
-            markers.addLayer(marker);
+            markersToAdd.push(marker);
             displayedCount++;
         } else {
              console.warn("Skipping physician due to invalid Lat/Lng:", doc.Name, doc.Latitude, doc.Longitude);
          }
     });
+    
+    // Add all markers at once for better performance
+    markersToAdd.forEach(marker => markers.addLayer(marker));
+    
     resultsCount.textContent = `Showing ${displayedCount} physician(s).`;
 
-    // Optional: Adjust map bounds to fit markers
-    if (displayedCount > 0) {
+    // Optional: Adjust map bounds to fit markers (only if reasonable number)
+    if (displayedCount > 0 && displayedCount < 200) { // Avoid fitBounds for too many markers
          try {
-             map.fitBounds(markers.getBounds().pad(0.1)); // Add slight padding
+             map.fitBounds(markers.getBounds().pad(0.1));
          } catch (e) {
              console.warn("Could not fit bounds, likely no valid markers.", e);
-             // Keep default view if fitBounds fails
              map.setView(MAP_CENTER, INITIAL_ZOOM);
          }
-    } else if (allPhysicians.length > 0) {
-         // If filtering resulted in no matches, reset to default view
+    } else if (displayedCount === 0 && allPhysicians.length > 0) {
          map.setView(MAP_CENTER, INITIAL_ZOOM);
     }
 }
@@ -307,7 +322,12 @@ async function fetchPhysicianData() {
         }
 
         allPhysicians = data.physicians;
-        console.log("Fetched Physicians:", allPhysicians); // Log to console for debugging
+        
+        // Debug: Check the first physician's available fields (comment out for production)
+        // if (allPhysicians.length > 0) {
+        //     console.log("Sample physician fields:", Object.keys(allPhysicians[0]));
+        //     console.log("Sample physician data:", allPhysicians[0]);
+        // }
 
         populateFilters(allPhysicians);
         addMarkers(allPhysicians); // Display all initially
@@ -426,8 +446,10 @@ function resetFilters() {
     distanceSlider.value = 10;
     updateDistanceValue();
     
-    // Hide dynamic elements
-    subspecialtyContainer.style.display = 'none';
+    // Repopulate subspecialties with all available options when specialty is cleared
+    populateSubspecialtiesForSpecialty('');
+    
+    // Hide distance slider only
     distanceContainer.classList.remove('show');
     
     addMarkers(allPhysicians);

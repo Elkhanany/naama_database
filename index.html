@@ -17,19 +17,19 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); color: #2c3e50; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between;">
+    <header style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); color: #000000; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; font-family: 'Tahoma', sans-serif;">
         <div style="display: flex; align-items: center; gap: 15px;">
             <img src="https://naama.com/wp-content/uploads/2025/01/New2025-WH-NAAMA-Full-logo.png" alt="NAAMA Logo" style="height: 50px;">
             <div>
-                <h1 style="margin: 0; font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em; font-family: 'Playfair Display', serif;">
+                <h1 style="margin: 0; font-size: 1.6rem; font-weight: 600; letter-spacing: -0.02em; font-family: 'Tahoma', sans-serif; color: #000000;">
                     <i class="fas fa-user-md" style="margin-right: 10px; color: #5dade2;"></i>
                     Physician Directory
                 </h1>
-                <p style="margin: 0; font-size: 0.9rem; color: #718096; font-style: italic;">Find healthcare providers near you</p>
+                <p style="margin: 0; font-size: 0.9rem; color: #000000; font-style: italic;">Find healthcare providers near you</p>
             </div>
         </div>
         <div style="text-align: right;">
-            <span style="font-size: 0.8rem; color: #718096;">National Arab American Medical Association</span>
+            <span style="font-size: 0.8rem; color: #000000;">National Arab American Medical Association</span>
         </div>
     </header>
 
@@ -38,11 +38,14 @@
             <h2><i class="fas fa-filter" style="margin-right: 8px; color: #667eea;"></i>Filters</h2>
             
             <div class="filter-group">
-                <label for="specialty-filter"><i class="fas fa-stethoscope" style="margin-right: 5px;"></i>Specialty:</label>
-                <select id="specialty-filter">
-                    <option value="">All Specialties</option>
-                    <!-- Options will be populated by JS -->
-                </select>
+                <!-- Specialty filter with matching box style -->
+                <div class="specialty-filter">
+                    <label for="specialty-filter"><i class="fas fa-stethoscope" style="margin-right: 5px;"></i>Specialty:</label>
+                    <select id="specialty-filter">
+                        <option value="">All Specialties</option>
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
                 
                 <!-- Subspecialty filter (always visible) -->
                 <div id="subspecialty-container" class="subspecialty-filter">

@@ -21,7 +21,7 @@ const resetButton = document.getElementById('reset-button');
 const resultsCount = document.getElementById('results-count');
 
 // Subspecialty data will be populated from actual physician data field
-// "Internal Medicine and Pediatric Subspecialty"
+// "Subpecialty"
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -101,8 +101,8 @@ function populateSubspecialtiesForSpecialty(selectedSpecialty) {
     if (!selectedSpecialty) {
         // If no specialty is selected, populate with all unique subspecialties
         allPhysicians.forEach(doc => {
-            if (doc['Internal Medicine and Pediatric Subspecialty']) {
-                const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
+            if (doc['Subpecialty']) {
+                const subspecialtyValue = doc['Subpecialty'].trim();
                 if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
                     subspecialtiesToPopulate.add(subspecialtyValue);
                 }
@@ -113,8 +113,8 @@ function populateSubspecialtiesForSpecialty(selectedSpecialty) {
         allPhysicians.forEach(doc => {
             // Use includes for more flexible matching, but still case-sensitive for accuracy
             if (doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
-                if (doc['Internal Medicine and Pediatric Subspecialty']) {
-                    const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
+                if (doc['Subpecialty']) {
+                    const subspecialtyValue = doc['Subpecialty'].trim();
                     if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
                         subspecialtiesToPopulate.add(subspecialtyValue);
                     }
@@ -206,7 +206,7 @@ function addMarkers(physicians) {
                 <div style="font-family: 'Tahoma', sans-serif; min-width: ${isMobile ? '240px' : '250px'};" class="${isMobile ? 'mobile-friendly-popup' : ''}">
                     <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #000000; font-size: ${isMobile ? '1rem' : '1.1rem'};">
                         <i class="fas fa-user-md" style="color: #5dade2; margin-right: 8px;"></i>
-                        ${doc.Name}
+                        ${doc['Full Name']}
                     </h3>
                     <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
@@ -214,25 +214,25 @@ function addMarkers(physicians) {
                     </div>
                     <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-hospital" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Practice:</strong> ${doc.PracticeName}
+                        <strong>Practice:</strong> ${doc['Practice Name']}
                     </div>
                     <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-map-marker-alt" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Address:</strong> ${doc.Address}
+                        <strong>Address:</strong> ${doc['Practice_address']}
                     </div>`;
             
-            if (doc.LanguagesSpoken) {
+            if (doc['Languages Spoken']) {
                 popupContent += `
                     <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                         <i class="fas fa-language" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                        <strong>Languages:</strong> ${doc.LanguagesSpoken}
+                        <strong>Languages:</strong> ${doc['Languages Spoken']}
                     </div>`;
             }
             
-            if (doc.ProfileURL && doc.ProfileURL.startsWith('http')) {
+            if (doc['Practice Webpage (If available)'] && doc['Practice Webpage (If available)'].startsWith('http')) {
                 popupContent += `
                     <div style="margin: ${isMobile ? '10px' : '12px'} 0 0 0;">
-                        <a href="${doc.ProfileURL}" target="_blank" 
+                        <a href="${doc['Practice Webpage (If available)']}" target="_blank" 
                            style="display: inline-block; background: linear-gradient(135deg, #5dade2 0%, #2980b9 100%); 
                                   color: white; padding: ${isMobile ? '10px 14px' : '8px 16px'}; text-decoration: none; border-radius: 6px; 
                                   font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation; font-family: 'Tahoma', sans-serif;">
@@ -248,7 +248,7 @@ function addMarkers(physicians) {
             markersToAdd.push(marker);
             displayedCount++;
         } else {
-             console.warn("Skipping physician due to invalid Lat/Lng:", doc.Name, doc.Latitude, doc.Longitude);
+             console.warn("Skipping physician due to invalid Lat/Lng:", doc['Full Name'], doc.Latitude, doc.Longitude);
          }
     });
     
@@ -326,9 +326,9 @@ function populateFilters(physicians) {
     physicians.forEach(doc => {
         if (doc.Specialty) specialties.add(doc.Specialty.trim());
         
-        if (doc.LanguagesSpoken) {
+        if (doc['Languages Spoken']) {
             // Handle potentially comma-separated languages
-            doc.LanguagesSpoken.split(',').forEach(lang => {
+            doc['Languages Spoken'].split(',').forEach(lang => {
                 if (lang.trim()) languages.add(lang.trim());
             });
         }
@@ -376,15 +376,15 @@ async function applyFilters() {
     // Filter by subspecialty
     if (selectedSubspecialty) {
         filtered = filtered.filter(doc => 
-            doc['Internal Medicine and Pediatric Subspecialty'] && 
-            doc['Internal Medicine and Pediatric Subspecialty'].toLowerCase().includes(selectedSubspecialty.toLowerCase())
+            doc['Subpecialty'] && 
+            doc['Subpecialty'].toLowerCase().includes(selectedSubspecialty.toLowerCase())
         );
     }
 
     // Filter by language
     if (selectedLanguage) {
         filtered = filtered.filter(doc => 
-            doc.LanguagesSpoken && doc.LanguagesSpoken.toLowerCase().includes(selectedLanguage.toLowerCase())
+            doc['Languages Spoken'] && doc['Languages Spoken'].toLowerCase().includes(selectedLanguage.toLowerCase())
         );
     }
 
@@ -432,12 +432,12 @@ function updateListView(physicians) {
     }
     physicians.forEach(doc => {
         const li = document.createElement('li');
-        li.innerHTML = `<b>${doc.Name}</b> (${doc.Specialty})<br>
-                        ${doc.PracticeName}<br>
-                        ${doc.Address}<br>
-                        Languages: ${doc.LanguagesSpoken || 'N/A'}`;
-         if (doc.ProfileURL && doc.ProfileURL.startsWith('http')) {
-                li.innerHTML += ` <a href="${doc.ProfileURL}" target="_blank">[Profile]</a>`;
+        li.innerHTML = `<b>${doc['Full Name']}</b> (${doc.Specialty})<br>
+                        ${doc['Practice Name']}<br>
+                        ${doc['Practice_address']}<br>
+                        Languages: ${doc['Languages Spoken'] || 'N/A'}`;
+         if (doc['Practice Webpage (If available)'] && doc['Practice Webpage (If available)'].startsWith('http')) {
+                li.innerHTML += ` <a href="${doc['Practice Webpage (If available)']}" target="_blank">[Profile]</a>`;
             }
         physicianList.appendChild(li);
     });

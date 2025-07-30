@@ -96,6 +96,7 @@ function populateSubspecialtiesForSpecialty(selectedSpecialty) {
     // Clear current subspecialty options
     subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
     
+    console.log(`populateSubspecialtiesForSpecialty called with specialty: "${selectedSpecialty}"`);
     const subspecialtiesToPopulate = new Set();
 
     if (!selectedSpecialty) {
@@ -123,6 +124,7 @@ function populateSubspecialtiesForSpecialty(selectedSpecialty) {
         });
     }
     
+    console.log('Found subspecialties:', [...subspecialtiesToPopulate]);
     const sortedSubspecialties = [...subspecialtiesToPopulate].sort();
     sortedSubspecialties.forEach(subspec => {
         const option = document.createElement('option');
@@ -297,7 +299,18 @@ async function fetchPhysicianData() {
             throw new Error("Received invalid data format from the server.");
         }
 
-        allPhysicians = data.physicians;
+        // Normalize object keys and string values to trim whitespace around header names and values
+        allPhysicians = data.physicians.map(doc => {
+            const normalized = {};
+            Object.keys(doc).forEach(key => {
+                const trimmedKey = key.trim();
+                let val = doc[key];
+                // Trim string values
+                if (typeof val === 'string') val = val.trim();
+                normalized[trimmedKey] = val;
+            });
+            return normalized;
+        });
 
         populateFilters(allPhysicians);
         addMarkers(allPhysicians); // Display all initially

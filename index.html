@@ -57,11 +57,13 @@
                 </div>
             </div>
             
-            <div class="filter-group">
-                <label for="zip-filter"><i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i>Zip Code:</label>
-                <input type="text" id="zip-filter" placeholder="Enter Zip Code">
+            <div class="filter-group zip-distance-group">
+                <div class="zip-code-filter">
+                    <label for="zip-filter"><i class="fas fa-map-marker-alt" style="margin-right: 5px;"></i>Zip Code:</label>
+                    <input type="text" id="zip-filter" placeholder="Enter Zip Code">
+                </div>
                 
-                <!-- Distance slider (hidden by default) -->
+                <!-- Distance slider (always visible) -->
                 <div id="distance-container" class="distance-slider-container">
                     <label><i class="fas fa-route" style="margin-right: 5px;"></i>Distance Range:</label>
                     <div class="slider-wrapper">
@@ -80,10 +82,6 @@
             </div>
             
             <div class="button-group">
-                <button id="filter-button" class="btn btn-primary">
-                    <i class="fas fa-search"></i>
-                    Apply Filters
-                </button>
                 <button id="reset-button" class="btn btn-secondary">
                     <i class="fas fa-undo"></i>
                     Reset

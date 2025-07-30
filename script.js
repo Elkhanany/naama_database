@@ -17,7 +17,6 @@ const distanceSlider = document.getElementById('distance-slider');
 const distanceContainer = document.getElementById('distance-container');
 const distanceValue = document.getElementById('distance-value');
 const languageFilter = document.getElementById('language-filter');
-const filterButton = document.getElementById('filter-button');
 const resetButton = document.getElementById('reset-button');
 const resultsCount = document.getElementById('results-count');
 
@@ -32,25 +31,21 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
-    filterButton.addEventListener('click', applyFilters);
     resetButton.addEventListener('click', resetFilters);
     
-    // Dynamic filtering - no need for apply button
+    // Dynamic filtering for all controls
     specialtyFilter.addEventListener('change', () => {
         handleSpecialtyChange();
-        applyFilters(); // Auto-apply filters
+        applyFilters(); 
     });
     
     subspecialtyFilter.addEventListener('change', applyFilters);
     languageFilter.addEventListener('change', applyFilters);
+    zipFilter.addEventListener('input', applyFilters); // Filter as user types zip
     
-    // Zip code change handler for distance slider
-    zipFilter.addEventListener('input', handleZipCodeChange);
-    
-    // Distance slider handler with dynamic filtering
     distanceSlider.addEventListener('input', () => {
         updateDistanceValue();
-        applyFilters(); // Auto-apply when slider changes
+        applyFilters(); 
     });
     
     // Mobile-specific optimizations
@@ -97,63 +92,44 @@ function handleSpecialtyChange() {
     populateSubspecialtiesForSpecialty(selectedSpecialty);
 }
 
-function handleZipCodeChange() {
-    const zipCode = zipFilter.value.trim();
-    
-    if (zipCode.length === 5 && /^\d+$/.test(zipCode)) {
-        // Show distance slider when valid zip is entered
-        distanceContainer.classList.add('show');
-    } else {
-        // Hide distance slider when zip is invalid or empty
-        distanceContainer.classList.remove('show');
-    }
-}
-
 function populateSubspecialtiesForSpecialty(selectedSpecialty) {
     // Clear current subspecialty options
     subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
     
+    const subspecialtiesToPopulate = new Set();
+
     if (!selectedSpecialty) {
-        // If no specialty selected, show all subspecialties
-        const allSubspecialties = new Set();
+        // If no specialty is selected, populate with all unique subspecialties
         allPhysicians.forEach(doc => {
             if (doc['Internal Medicine and Pediatric Subspecialty']) {
                 const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
                 if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
-                    allSubspecialties.add(subspecialtyValue);
+                    subspecialtiesToPopulate.add(subspecialtyValue);
                 }
             }
         });
-        
-        const sortedSubspecialties = [...allSubspecialties].sort();
-        sortedSubspecialties.forEach(subspec => {
-            const option = document.createElement('option');
-            option.value = subspec;
-            option.textContent = subspec;
-            subspecialtyFilter.appendChild(option);
-        });
     } else {
-        // Filter subspecialties based on selected specialty
-        const relevantSubspecialties = new Set();
+        // Filter subspecialties based on the selected specialty (more flexible matching)
         allPhysicians.forEach(doc => {
+            // Use includes for more flexible matching, but still case-sensitive for accuracy
             if (doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
                 if (doc['Internal Medicine and Pediatric Subspecialty']) {
                     const subspecialtyValue = doc['Internal Medicine and Pediatric Subspecialty'].trim();
                     if (subspecialtyValue && subspecialtyValue !== '' && subspecialtyValue !== 'N/A') {
-                        relevantSubspecialties.add(subspecialtyValue);
+                        subspecialtiesToPopulate.add(subspecialtyValue);
                     }
                 }
             }
         });
-        
-        const sortedSubspecialties = [...relevantSubspecialties].sort();
-        sortedSubspecialties.forEach(subspec => {
-            const option = document.createElement('option');
-            option.value = subspec;
-            option.textContent = subspec;
-            subspecialtyFilter.appendChild(option);
-        });
     }
+    
+    const sortedSubspecialties = [...subspecialtiesToPopulate].sort();
+    sortedSubspecialties.forEach(subspec => {
+        const option = document.createElement('option');
+        option.value = subspec;
+        option.textContent = subspec;
+        subspecialtyFilter.appendChild(option);
+    });
 }
 
 function updateDistanceValue() {
@@ -322,12 +298,6 @@ async function fetchPhysicianData() {
         }
 
         allPhysicians = data.physicians;
-        
-        // Debug: Check the first physician's available fields (comment out for production)
-        // if (allPhysicians.length > 0) {
-        //     console.log("Sample physician fields:", Object.keys(allPhysicians[0]));
-        //     console.log("Sample physician data:", allPhysicians[0]);
-        // }
 
         populateFilters(allPhysicians);
         addMarkers(allPhysicians); // Display all initially
@@ -448,9 +418,6 @@ function resetFilters() {
     
     // Repopulate subspecialties with all available options when specialty is cleared
     populateSubspecialtiesForSpecialty('');
-    
-    // Hide distance slider only
-    distanceContainer.classList.remove('show');
     
     addMarkers(allPhysicians);
 }

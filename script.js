@@ -5,7 +5,7 @@ const INITIAL_ZOOM = 10;
 
 // --- Global Variables ---
 let map;
-let allPhysicians = []; // To store the fetched data
+let allProviders = []; // To store the fetched data
 let specialtySubspecialtyMap = new Map(); // Map specialty to its subspecialties
 // Use featureGroup to enable getBounds for marker fitting
 let markers = L.featureGroup(); // Feature group to manage markers
@@ -16,6 +16,7 @@ let filterTimeout = null;
 const FILTER_DEBOUNCE_MS = 300; // Debounce filtering for better performance
 
 // --- DOM Elements ---
+const occupationFilter = document.getElementById('occupation-filter');
 const specialtyFilter = document.getElementById('specialty-filter');
 const subspecialtyFilter = document.getElementById('subspecialty-filter');
 const subspecialtyContainer = document.getElementById('subspecialty-container');
@@ -27,7 +28,7 @@ const languageFilter = document.getElementById('language-filter');
 const resetButton = document.getElementById('reset-button');
 const resultsCount = document.getElementById('results-count');
 
-// Subspecialty data will be populated from actual physician data field
+// Subspecialty data will be populated from actual provider data field
 // "Subpecialty"
 
 // --- Initialization ---
@@ -37,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('Map element exists:', !!document.getElementById('map'));
     
     initializeMap();
-    fetchPhysicianData();
+    fetchProviderData();
     setupEventListeners();
 });
 
@@ -51,6 +52,8 @@ function setupEventListeners() {
     };
     
     // Dynamic filtering for all controls with debouncing
+    occupationFilter.addEventListener('change', debouncedFilter);
+    
     specialtyFilter.addEventListener('change', () => {
         handleSpecialtyChange();
         debouncedFilter(); 
@@ -153,16 +156,16 @@ function populateSubspecialtiesForSpecialty(selectedSpecialty) {
     // Clear current subspecialty options
     subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
     console.log(`populateSubspecialtiesForSpecialty: selectedSpecialty='${selectedSpecialty}'`);
-    console.log(`Total physicians: ${allPhysicians.length}`);
+    console.log(`Total providers: ${allProviders.length}`);
     const subspecialtiesSet = new Set();
-    allPhysicians.forEach(doc => {
-        const spec = doc.Specialty || '';
+    allProviders.forEach(doc => {
+        const spec = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
         const subspec = subspecialtyKey && doc[subspecialtyKey] ? doc[subspecialtyKey].trim() : '';
         if (!subspec || subspec === 'N/A') return;
         if (!selectedSpecialty) {
             subspecialtiesSet.add(subspec);
         } else if (spec.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
-            console.log(` Including subspecialty '${subspec}' from doc '${doc['Full Name']}' (Specialty='${spec}')`);
+            console.log(` Including subspecialty '${subspec}' from doc '${doc['Name']}' (Specialty='${spec}')`);
             subspecialtiesSet.add(subspec);
         }
     });
@@ -250,12 +253,12 @@ function initializeMap() {
     }
 }
 
-function addMarkers(physicians) {
+function addMarkers(providers) {
     // Use more efficient clearing and adding
     markers.clearLayers();
 
-    if (!Array.isArray(physicians)) {
-        console.error("Data is not an array:", physicians);
+    if (!Array.isArray(providers)) {
+        console.error("Data is not an array:", providers);
         resultsCount.textContent = "Error loading data.";
         return;
     }
@@ -264,17 +267,17 @@ function addMarkers(physicians) {
     
     // Performance optimization: limit number of markers for large datasets
     const MAX_MARKERS = 500; // Reasonable limit for performance
-    const shouldLimitMarkers = physicians.length > MAX_MARKERS;
-    const physiciansToDisplay = shouldLimitMarkers ? physicians.slice(0, MAX_MARKERS) : physicians;
+    const shouldLimitMarkers = providers.length > MAX_MARKERS;
+    const providersToDisplay = shouldLimitMarkers ? providers.slice(0, MAX_MARKERS) : providers;
     
     if (shouldLimitMarkers) {
-        console.log(`Performance optimization: Showing first ${MAX_MARKERS} of ${physicians.length} physicians`);
+        console.log(`Performance optimization: Showing first ${MAX_MARKERS} of ${providers.length} providers`);
     }
     
-    // Group physicians by location to handle overlapping markers
+    // Group providers by location to handle overlapping markers
     const locationGroups = new Map();
     
-    physiciansToDisplay.forEach(doc => {
+    providersToDisplay.forEach(doc => {
         // Double check lat/lng are valid numbers before adding marker
         if (doc.Latitude && doc.Longitude && !isNaN(doc.Latitude) && !isNaN(doc.Longitude)) {
             // Use address as primary key, fallback to coordinates if no address
@@ -285,7 +288,7 @@ function addMarkers(physicians) {
             }
             locationGroups.get(locationKey).push(doc);
         } else {
-             console.warn("Skipping physician due to invalid Lat/Lng:", doc.Name || doc['Full Name'], doc.Latitude, doc.Longitude);
+             console.warn("Skipping provider due to invalid Lat/Lng:", doc.Name || doc['Full Name'], doc.Latitude, doc.Longitude);
          }
     });
     
@@ -328,9 +331,9 @@ function addMarkers(physicians) {
     }
     
     // Update results count with performance info
-    let countText = `Showing ${displayedCount} physician(s)`;
+    let countText = `Showing ${displayedCount} provider(s)`;
     if (shouldLimitMarkers) {
-        countText += ` (limited from ${physicians.length} for performance)`;
+        countText += ` (limited from ${providers.length} for performance)`;
     }
     resultsCount.textContent = countText;
 
@@ -342,7 +345,7 @@ function addMarkers(physicians) {
              console.warn("Could not fit bounds, likely no valid markers.", e);
              map.setView(MAP_CENTER, INITIAL_ZOOM);
          }
-    } else if (displayedCount === 0 && physiciansToDisplay.length > 0) {
+    } else if (displayedCount === 0 && providersToDisplay.length > 0) {
          map.setView(MAP_CENTER, INITIAL_ZOOM);
     }
 }
@@ -359,10 +362,21 @@ function generatePopupContent(doc, docs, index) {
             <h3 style="margin: 0 0 ${isMobile ? '8px' : '10px'} 0; color: #000000; font-size: ${isMobile ? '1rem' : '1.1rem'};">
                 <i class="fas fa-user-md" style="color: #5dade2; margin-right: 8px;"></i>
                 ${popupTitle}
-            </h3>
+            </h3>`;
+    
+    // Add occupation if available
+    if (doc.Occupation) {
+        popupContent += `
+            <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
+                <i class="fas fa-briefcase" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
+                <strong>Occupation:</strong> ${doc.Occupation}
+            </div>`;
+    }
+    
+    popupContent += `
             <div style="margin: ${isMobile ? '6px' : '8px'} 0; color: #000000;">
                 <i class="fas fa-stethoscope" style="color: #5dade2; margin-right: 8px; width: 16px;"></i>
-                <strong>Specialty:</strong> ${doc.Specialty || 'N/A'}
+                <strong>Specialty:</strong> ${doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || 'N/A'}
             </div>`;
     
     // Add subspecialty if available
@@ -421,12 +435,12 @@ function generatePopupContent(doc, docs, index) {
 }
 
 // --- Data Fetching and Processing ---
-async function fetchPhysicianData() {
+async function fetchProviderData() {
     // Show loading spinner
     const mapLoading = document.getElementById('map-loading');
     if (mapLoading) mapLoading.style.display = 'block';
     
-    resultsCount.textContent = "Loading physicians...";
+    resultsCount.textContent = "Loading providers...";
     resultsCount.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
     
     try {
@@ -447,7 +461,7 @@ async function fetchPhysicianData() {
         }
 
         // Normalize object keys and string values
-        allPhysicians = data.physicians.map(doc => {
+        allProviders = data.physicians.map(doc => {
             const normalized = {};
             Object.keys(doc).forEach(key => {
                 const trimmedKey = key.trim();
@@ -459,20 +473,24 @@ async function fetchPhysicianData() {
             return normalized;
         });
         // Detect subspecialty key if present
-        if (allPhysicians.length > 0) {
-            subspecialtyKey = Object.keys(allPhysicians[0]).find(k => k.toLowerCase().includes('subspecialty'));
+        if (allProviders.length > 0) {
+            subspecialtyKey = Object.keys(allProviders[0]).find(k => k.toLowerCase().includes('subspecialty'));
             console.log('Detected subspecialty field:', subspecialtyKey);
+            
+            // Debug: Check what fields we have
+            console.log('Available fields:', Object.keys(allProviders[0]));
+            console.log('Sample data:', allProviders[0]);
         }
         
-        populateFilters(allPhysicians);
-        addMarkers(allPhysicians); // Display all initially
+        populateFilters(allProviders);
+        addMarkers(allProviders); // Display all initially
         
         // Update results count with success styling
-        resultsCount.textContent = `Showing ${allPhysicians.length} physician(s).`;
+        resultsCount.textContent = `Showing ${allProviders.length} provider(s).`;
         resultsCount.style.background = "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)";
 
     } catch (error) {
-        console.error("Error fetching physician data:", error);
+        console.error("Error fetching provider data:", error);
         resultsCount.textContent = `Error loading data: ${error.message}`;
         resultsCount.style.background = "linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)";
         // Optionally display a more user-friendly error message on the page
@@ -488,19 +506,27 @@ function populateFilters(physicians) {
     // Debug: inspect the keys and sample values in the normalized physician data to verify field names
     if (physicians.length > 0) {
         console.log('populateFilters: first doc keys =', Object.keys(physicians[0]));
-        console.log('populateFilters: sample Specialty =', physicians[0].Specialty, '; sample Subspecialty =', physicians[0]['Subspecialty']);
+        console.log('populateFilters: sample Occupation =', physicians[0].Occupation, '; sample Specialty =', physicians[0].Specialty, '; sample Subspecialty =', physicians[0]['Subspecialty']);
     }
+    const occupations = new Set();
     const specialties = new Set();
     const languages = new Set();
     // Build map of specialty to subspecialty set
     specialtySubspecialtyMap.clear();
 
     physicians.forEach(doc => {
-        // Populate specialties set
-        if (doc.Specialty) specialties.add(doc.Specialty.trim());
+        // Populate occupations set
+        if (doc.Occupation) occupations.add(doc.Occupation.trim());
+        
+        // Populate specialties set - try multiple possible field names
+        const specialtyValue = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
+        if (specialtyValue && specialtyValue.trim()) {
+            specialties.add(specialtyValue.trim());
+        }
+        
         // Populate specialty→subspecialty map
-        const specKey = doc.Specialty?.trim();
-        const subspecVal = doc['Subspecialty'];
+        const specKey = specialtyValue?.trim();
+        const subspecVal = doc['Subspecialty'] || doc['subspecialty'] || '';
         if (specKey && subspecVal) {
             const subspec = subspecVal.trim();
             if (subspec && subspec !== 'N/A') {
@@ -524,8 +550,18 @@ function populateFilters(physicians) {
     specialtySubspecialtyMap.forEach((subSet, spec) => {
         console.log(`  Specialty: ${spec} → Subspecialties: [${[...subSet].join(', ')}]`);
     });
-    // Debug: log list of all specialties
+    // Debug: log list of all occupations and specialties
+    console.log('Occupations list:', [...occupations].sort());
     console.log('Specialties list:', [...specialtySubspecialtyMap.keys()].sort());
+
+    // Populate Occupation Dropdown
+    const sortedOccupations = [...occupations].sort();
+    sortedOccupations.forEach(occupation => {
+        const option = document.createElement('option');
+        option.value = occupation;
+        option.textContent = occupation;
+        occupationFilter.appendChild(option);
+    });
 
     // Populate Specialty Dropdown
     const sortedSpecialties = [...specialties].sort();
@@ -562,20 +598,29 @@ async function applyFilters() {
     resultsCount.textContent = "Filtering...";
     resultsCount.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
     
+    const selectedOccupation = occupationFilter.value;
     const selectedSpecialty = specialtyFilter.value;
     const selectedSubspecialty = subspecialtyFilter.value;
     const selectedLanguage = languageFilter.value;
     const enteredZip = zipFilter.value.trim();
     const maxDistance = parseFloat(distanceSlider.value);
 
-    let filtered = [...allPhysicians];
+    let filtered = [...allProviders];
 
     // Optimize filtering by breaking early when possible
-    // Filter by specialty (most selective first)
-    if (selectedSpecialty) {
+    // Filter by occupation (most selective first)
+    if (selectedOccupation) {
         filtered = filtered.filter(doc => 
-            doc.Specialty && doc.Specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())
+            doc.Occupation && doc.Occupation.toLowerCase().includes(selectedOccupation.toLowerCase())
         );
+    }
+    
+    // Filter by specialty
+    if (selectedSpecialty && filtered.length > 0) {
+        filtered = filtered.filter(doc => {
+            const specialtyValue = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
+            return specialtyValue && specialtyValue.toLowerCase().includes(selectedSpecialty.toLowerCase());
+        });
     }
 
     // Filter by subspecialty
@@ -620,6 +665,7 @@ async function applyFilters() {
 }
 
 function resetFilters() {
+    occupationFilter.value = '';
     specialtyFilter.value = '';
     subspecialtyFilter.value = '';
     languageFilter.value = '';
@@ -630,7 +676,7 @@ function resetFilters() {
     // Repopulate subspecialties with all available options when specialty is cleared
     populateSubspecialtiesForSpecialty('');
     
-    addMarkers(allPhysicians);
+    addMarkers(allProviders);
 }
 
 // --- Optional: List View Update ---

@@ -216,6 +216,26 @@ async function getZipCodeCoordinates(zipCode) {
         return null;
     }
 }
+
+// Helper function to format URLs properly
+function formatWebsiteURL(url) {
+    if (!url || typeof url !== 'string') {
+        return null;
+    }
+    
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+        return null;
+    }
+    
+    // If URL already has protocol, return as is
+    if (trimmedUrl.toLowerCase().startsWith('http://') || trimmedUrl.toLowerCase().startsWith('https://')) {
+        return trimmedUrl;
+    }
+    
+    // Add https:// protocol for domain names
+    return 'https://' + trimmedUrl;
+}
 function initializeMap() {
     console.log('Initializing map...');
     const mapElement = document.getElementById('map');
@@ -406,10 +426,12 @@ function generatePopupContent(doc, docs, index) {
             </div>`;
     }
     
-    if ((doc.ProfileURL || doc['Practice Webpage (If available)']) && (doc.ProfileURL || doc['Practice Webpage (If available)']).startsWith('http')) {
+    // Check for website/profile URL and format it properly
+    const websiteUrl = formatWebsiteURL(doc.ProfileURL || doc['Practice Webpage (If available)']);
+    if (websiteUrl) {
         popupContent += `
             <div style="margin: ${isMobile ? '10px' : '12px'} 0 0 0;">
-                <a href="${doc.ProfileURL || doc['Practice Webpage (If available)']}" target="_blank" 
+                <a href="${websiteUrl}" target="_blank" 
                    style="display: inline-block; background: linear-gradient(135deg, #5dade2 0%, #2980b9 100%); 
                           color: white; padding: ${isMobile ? '10px 14px' : '8px 16px'}; text-decoration: none; border-radius: 6px; 
                           font-size: ${isMobile ? '0.95rem' : '0.9rem'}; font-weight: 500; touch-action: manipulation; font-family: 'Tahoma', sans-serif;">
@@ -693,9 +715,12 @@ function updateListView(physicians) {
                         ${doc['Practice Name']}<br>
                         ${doc['Practice_address']}<br>
                         Languages: ${doc['Languages Spoken'] || 'N/A'}`;
-         if (doc['Practice Webpage (If available)'] && doc['Practice Webpage (If available)'].startsWith('http')) {
-                li.innerHTML += ` <a href="${doc['Practice Webpage (If available)']}" target="_blank">[Profile]</a>`;
-            }
+        
+        // Check for website URL and format it properly
+        const websiteUrl = formatWebsiteURL(doc['Practice Webpage (If available)']);
+        if (websiteUrl) {
+            li.innerHTML += ` <a href="${websiteUrl}" target="_blank">[Profile]</a>`;
+        }
         physicianList.appendChild(li);
     });
 }

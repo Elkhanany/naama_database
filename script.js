@@ -51,8 +51,11 @@ function setupEventListeners() {
         filterTimeout = setTimeout(applyFilters, FILTER_DEBOUNCE_MS);
     };
     
-    // Dynamic filtering for all controls with debouncing
-    occupationFilter.addEventListener('change', debouncedFilter);
+    // Dynamic filtering for all controls with debouncing and cascading behavior
+    occupationFilter.addEventListener('change', () => {
+        handleOccupationChange();
+        debouncedFilter();
+    });
     
     specialtyFilter.addEventListener('change', () => {
         handleSpecialtyChange();
@@ -147,9 +150,50 @@ function optimizeForMobile() {
     }
 }
 
+function handleOccupationChange() {
+    const selectedOccupation = occupationFilter.value;
+    populateSpecialtiesForOccupation(selectedOccupation);
+    
+    // Clear and reset subspecialty when occupation changes
+    subspecialtyFilter.value = '';
+    populateSubspecialtiesForSpecialty('');
+}
+
 function handleSpecialtyChange() {
     const selectedSpecialty = specialtyFilter.value;
     populateSubspecialtiesForSpecialty(selectedSpecialty);
+}
+
+function populateSpecialtiesForOccupation(selectedOccupation) {
+    // Clear current specialty options
+    specialtyFilter.innerHTML = '<option value="">All Specialties</option>';
+    console.log(`populateSpecialtiesForOccupation: selectedOccupation='${selectedOccupation}'`);
+    
+    const specialtiesSet = new Set();
+    allProviders.forEach(doc => {
+        const occupation = doc.Occupation || '';
+        const specialty = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
+        
+        if (!specialty || specialty.trim() === '' || specialty === 'N/A') return;
+        
+        if (!selectedOccupation) {
+            // Show all specialties if no occupation selected
+            specialtiesSet.add(specialty.trim());
+        } else if (occupation.toLowerCase().includes(selectedOccupation.toLowerCase())) {
+            console.log(`Including specialty '${specialty}' from provider '${doc.Name}' (Occupation='${occupation}')`);
+            specialtiesSet.add(specialty.trim());
+        }
+    });
+    
+    // Sort and populate specialty dropdown
+    [...specialtiesSet].sort().forEach(specialty => {
+        const option = document.createElement('option');
+        option.value = specialty;
+        option.textContent = specialty;
+        specialtyFilter.appendChild(option);
+    });
+    
+    console.log(`Found ${specialtiesSet.size} specialties for occupation '${selectedOccupation}'`);
 }
 
 function populateSubspecialtiesForSpecialty(selectedSpecialty) {
@@ -157,24 +201,39 @@ function populateSubspecialtiesForSpecialty(selectedSpecialty) {
     subspecialtyFilter.innerHTML = '<option value="">All Subspecialties</option>';
     console.log(`populateSubspecialtiesForSpecialty: selectedSpecialty='${selectedSpecialty}'`);
     console.log(`Total providers: ${allProviders.length}`);
+    
+    const selectedOccupation = occupationFilter.value;
     const subspecialtiesSet = new Set();
+    
     allProviders.forEach(doc => {
+        const occupation = doc.Occupation || '';
         const spec = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
         const subspec = subspecialtyKey && doc[subspecialtyKey] ? doc[subspecialtyKey].trim() : '';
+        
         if (!subspec || subspec === 'N/A') return;
-        if (!selectedSpecialty) {
-            subspecialtiesSet.add(subspec);
-        } else if (spec.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
-            console.log(` Including subspecialty '${subspec}' from doc '${doc['Name']}' (Specialty='${spec}')`);
+        
+        // Check if this provider matches the selected occupation (if any)
+        let occupationMatches = !selectedOccupation || occupation.toLowerCase().includes(selectedOccupation.toLowerCase());
+        
+        // Check if this provider matches the selected specialty (if any)
+        let specialtyMatches = !selectedSpecialty || spec.toLowerCase().includes(selectedSpecialty.toLowerCase());
+        
+        // Only include subspecialty if both occupation and specialty match
+        if (occupationMatches && specialtyMatches) {
+            console.log(`Including subspecialty '${subspec}' from doc '${doc['Name']}' (Occupation='${occupation}', Specialty='${spec}')`);
             subspecialtiesSet.add(subspec);
         }
     });
+    
+    // Sort and populate subspecialty dropdown
     [...subspecialtiesSet].sort().forEach(subspec => {
         const option = document.createElement('option');
         option.value = subspec;
         option.textContent = subspec;
         subspecialtyFilter.appendChild(option);
     });
+    
+    console.log(`Found ${subspecialtiesSet.size} subspecialties for occupation '${selectedOccupation}' and specialty '${selectedSpecialty}'`);
 }
 
 function updateDistanceValue() {
@@ -531,7 +590,6 @@ function populateFilters(physicians) {
         console.log('populateFilters: sample Occupation =', physicians[0].Occupation, '; sample Specialty =', physicians[0].Specialty, '; sample Subspecialty =', physicians[0]['Subspecialty']);
     }
     const occupations = new Set();
-    const specialties = new Set();
     const languages = new Set();
     // Build map of specialty to subspecialty set
     specialtySubspecialtyMap.clear();
@@ -540,24 +598,20 @@ function populateFilters(physicians) {
         // Populate occupations set
         if (doc.Occupation) occupations.add(doc.Occupation.trim());
         
-        // Populate specialties set - try multiple possible field names
-        const specialtyValue = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
-        if (specialtyValue && specialtyValue.trim()) {
-            specialties.add(specialtyValue.trim());
-        }
-        
         // Populate specialty→subspecialty map
-        const specKey = specialtyValue?.trim();
+        const specialtyValue = doc.Specialty || doc.specialty || doc.Subspecialty || doc.subspecialty || '';
         const subspecVal = doc['Subspecialty'] || doc['subspecialty'] || '';
-        if (specKey && subspecVal) {
+        if (specialtyValue && subspecVal) {
+            const specKey = specialtyValue.trim();
             const subspec = subspecVal.trim();
-            if (subspec && subspec !== 'N/A') {
+            if (specKey && subspec && subspec !== 'N/A') {
                 if (!specialtySubspecialtyMap.has(specKey)) {
                     specialtySubspecialtyMap.set(specKey, new Set());
                 }
                 specialtySubspecialtyMap.get(specKey).add(subspec);
             }
         }
+        
         // Populate languages set
         if (doc.LanguagesSpoken || doc['Languages Spoken']) {
             const languageField = doc.LanguagesSpoken || doc['Languages Spoken'];
@@ -572,9 +626,8 @@ function populateFilters(physicians) {
     specialtySubspecialtyMap.forEach((subSet, spec) => {
         console.log(`  Specialty: ${spec} → Subspecialties: [${[...subSet].join(', ')}]`);
     });
-    // Debug: log list of all occupations and specialties
+    // Debug: log list of all occupations
     console.log('Occupations list:', [...occupations].sort());
-    console.log('Specialties list:', [...specialtySubspecialtyMap.keys()].sort());
 
     // Populate Occupation Dropdown
     const sortedOccupations = [...occupations].sort();
@@ -585,14 +638,8 @@ function populateFilters(physicians) {
         occupationFilter.appendChild(option);
     });
 
-    // Populate Specialty Dropdown
-    const sortedSpecialties = [...specialties].sort();
-    sortedSpecialties.forEach(spec => {
-        const option = document.createElement('option');
-        option.value = spec;
-        option.textContent = spec;
-        specialtyFilter.appendChild(option);
-    });
+    // Initialize specialty dropdown with all specialties (no occupation selected yet)
+    populateSpecialtiesForOccupation('');
 
     // Populate subspecialty dropdown or hide
     if (subspecialtyKey) {
@@ -695,8 +742,9 @@ function resetFilters() {
     distanceSlider.value = 10;
     updateDistanceValue();
     
-    // Repopulate subspecialties with all available options when specialty is cleared
-    populateSubspecialtiesForSpecialty('');
+    // Repopulate all filter options when reset
+    populateSpecialtiesForOccupation(''); // Repopulate all specialties
+    populateSubspecialtiesForSpecialty(''); // Repopulate all subspecialties
     
     addMarkers(allProviders);
 }
